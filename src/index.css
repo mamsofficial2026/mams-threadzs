@@ -1,0 +1,18 @@
+/* Tailwind v4-kaga intha pudhu line thaan thevai */
+@import "tailwindcss";
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background-color: #ffffff;
+  color: #111111;
+  overflow-x: hidden;
+}
+
+/* Scrollbar maraikka chinna trick */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
