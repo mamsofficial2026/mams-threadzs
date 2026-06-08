@@ -2,16 +2,12 @@ import { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, ShoppingBag, ShoppingCart, 
   Users, Settings, LogOut, Menu, X, TrendingUp, Package,
-  Plus, Edit, Trash2, Search, XCircle, Eye, Truck, User, MapPin, FileText, Printer, UploadCloud, MessageCircle, AlertTriangle, MonitorPlay, Loader2 
+  Plus, Edit, Trash2, Search, XCircle, Eye, Truck, User, MapPin, FileText, Printer, UploadCloud, MessageCircle, AlertTriangle, MonitorPlay, Loader2, ChevronRight 
 } from 'lucide-react';
 
-// --- Imported our Central Godown (Global State) & Supabase ---
 import { useProducts } from '../context/ProductContext';
 import { supabase } from '../supabaseClient'; 
 
-// =========================================================================
-// 🚀 CLOUDINARY CONFIGURATION (YOUR DETAILS)
-// =========================================================================
 const CLOUDINARY_CLOUD_NAME = "dzpasg4hh"; 
 const CLOUDINARY_UPLOAD_PRESET = "threadzs_preset"; 
 const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
@@ -21,39 +17,46 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isUploading, setIsUploading] = useState(false);
 
-  // ================= 1. DYNAMIC ORDERS STATE (NOW FETCHED FROM SUPABASE) =================
   const [orders, setOrders] = useState([]);
   const [isFetchingOrders, setIsFetchingOrders] = useState(true);
 
   const [selectedOrder, setSelectedOrder] = useState(null); 
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
 
-  // ================= 2. DYNAMIC PRODUCTS & HERO STATE =================
-  const [categories, setCategories] = useState(['Men', 'Women', 'Gen Z', 'Accessories']);
   const { products, setProducts, heroBanner, setHeroBanner } = useProducts();
 
-  // ================= CRUD LOGIC FOR PRODUCTS =================
+  const [categoryMap, setCategoryMap] = useState({
+    'Men': ['T-Shirts', 'Shirts', 'Hoodies', 'Jeans'],
+    'Women': ['Tops', 'Dresses', 'Activewear'],
+    'Gen Z': ['Oversized Tees', 'Streetwear', 'Cargos'],
+    'Accessories': ['Caps', 'Bags', 'Chains']
+  });
+
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
+  const [managingSubCategoryFor, setManagingSubCategoryFor] = useState(null);
+  const [newCatInput, setNewCatInput] = useState('');
+  const [newSubCatInput, setNewSubCatInput] = useState('');
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   
   const [formData, setFormData] = useState({
-    name: '', category: 'Men', price: '', original_price: '', stock: '', images: [], description: '', sizes: []
+    name: '', category: 'Men', subCategory: 'T-Shirts', price: '', original_price: '', stock: '', images: [], description: '', sizes: []
   });
-  const [newCategory, setNewCategory] = useState('');
-  const [isAddingCategory, setIsAddingCategory] = useState(false);
 
   const availableSizesList = ["XS", "S", "M", "L", "XL", "XXL"];
 
-  // --- NEW: FETCH ORDERS FROM SUPABASE ---
+  // ================= 3. DB FIXED: IG FEED STATE & LOGIC =================
+  const [igFeedData, setIgFeedData] = useState([]);
+  // ADDED BACK: image_url to state
+  const [igFormData, setIgFormData] = useState({ image_url: '', post_link: '', likes: '', is_reel: false });
+  const [isSubmittingIg, setIsSubmittingIg] = useState(false);
+
   useEffect(() => {
     const fetchOrders = async () => {
       try {
         setIsFetchingOrders(true);
-        const { data, error } = await supabase
-          .from('orders')
-          .select('*')
-          .order('created_at', { ascending: false });
-
+        const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
         if (error) throw error;
         setOrders(data || []);
       } catch (error) {
@@ -63,50 +66,56 @@ const AdminDashboard = () => {
       }
     };
 
-    if (activeTab === 'dashboard' || activeTab === 'orders') {
-      fetchOrders();
-    }
+    const fetchIgFeed = async () => {
+      try {
+        const { data, error } = await supabase.from('ig_feed').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        if (data) setIgFeedData(data);
+      } catch (error) {
+        console.error("Error fetching IG Feed:", error);
+      }
+    };
+
+    if (activeTab === 'dashboard' || activeTab === 'orders') fetchOrders();
+    if (activeTab === 'instagram') fetchIgFeed();
+
   }, [activeTab]);
 
-
-  const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'category') {
+      const firstSub = categoryMap[value] ? categoryMap[value][0] : '';
+      setFormData({ ...formData, category: value, subCategory: firstSub || '' });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+  };
 
   const handleSizeToggle = (size) => {
     setFormData((prevData) => {
       const currentSizes = prevData.sizes || [];
-      if (currentSizes.includes(size)) {
-        return { ...prevData, sizes: currentSizes.filter((s) => s !== size) };
-      } else {
-        return { ...prevData, sizes: [...currentSizes, size] };
-      }
+      return currentSizes.includes(size) 
+        ? { ...prevData, sizes: currentSizes.filter((s) => s !== size) }
+        : { ...prevData, sizes: [...currentSizes, size] };
     });
   };
 
-  // --- CLOUDINARY MULTIPLE IMAGE UPLOAD ---
   const handleMultipleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
-
     setIsUploading(true);
-
     try {
       const uploadPromises = files.map(async (file) => {
         const data = new FormData();
         data.append('file', file);
         data.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
         data.append('cloud_name', CLOUDINARY_CLOUD_NAME);
-
         const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: data });
         const uploadedImage = await response.json();
         return uploadedImage.secure_url;
       });
-
       const uploadedUrls = await Promise.all(uploadPromises);
-
-      setFormData(prev => ({
-        ...prev,
-        images: [...(prev.images || []), ...uploadedUrls]
-      }));
+      setFormData(prev => ({ ...prev, images: [...(prev.images || []), ...uploadedUrls] }));
     } catch (error) {
       alert("Cloudinary Upload Failed! Check your internet or config.");
     } finally {
@@ -114,28 +123,20 @@ const AdminDashboard = () => {
     }
   };
 
-  const removeImage = (indexToRemove) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter((_, index) => index !== indexToRemove)
-    }));
-  };
+  const removeImage = (indexToRemove) => setFormData(prev => ({ ...prev, images: prev.images.filter((_, index) => index !== indexToRemove) }));
 
   const handleAddProduct = () => {
     setEditingId(null);
-    setFormData({ name: '', category: categories[0], price: '', original_price: '', stock: '', images: [], description: '', sizes: [] });
+    const initialCat = Object.keys(categoryMap)[0] || '';
+    const initialSubCat = categoryMap[initialCat]?.[0] || '';
+    setFormData({ name: '', category: initialCat, subCategory: initialSubCat, price: '', original_price: '', stock: '', images: [], description: '', sizes: [] });
     setIsModalOpen(true);
   };
 
   const handleEdit = (product) => {
     setEditingId(product.id);
     const productImages = product.images ? product.images : (product.image ? [product.image] : []);
-    setFormData({ 
-      ...product, 
-      sizes: product.sizes || [], 
-      images: productImages,
-      original_price: product.original_price || '' 
-    });
+    setFormData({ ...product, sizes: product.sizes || [], images: productImages, original_price: product.original_price || '', subCategory: product.sub_category || '' });
     setIsModalOpen(true);
   };
 
@@ -153,35 +154,24 @@ const AdminDashboard = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!formData.images || formData.images.length === 0) {
-      alert("Please upload at least one product image!");
-      return;
-    }
+    if (!formData.images || formData.images.length === 0) return alert("Please upload at least one product image!");
 
     try {
       setIsUploading(true);
-
       const productData = {
-        name: formData.name,
-        category: formData.category,
-        price: formData.price.toString(),
-        original_price: formData.original_price ? formData.original_price.toString() : '',
-        stock: parseInt(formData.stock),
-        sizes: formData.sizes,
-        description: formData.description,
-        images: formData.images
+        name: formData.name, category: formData.category, sub_category: formData.subCategory, 
+        price: formData.price.toString(), original_price: formData.original_price ? formData.original_price.toString() : '', 
+        stock: parseInt(formData.stock), sizes: formData.sizes, description: formData.description, images: formData.images
       };
 
       if (editingId) {
         const { error } = await supabase.from('products').update(productData).eq('id', editingId);
         if (error) throw error;
-        setProducts(products.map(p => p.id === editingId ? { ...formData, id: editingId } : p));
+        setProducts(products.map(p => p.id === editingId ? { ...formData, sub_category: formData.subCategory, id: editingId } : p));
       } else {
         const { data, error } = await supabase.from('products').insert([productData]).select();
         if (error) throw error;
-        if (data && data.length > 0) {
-           setProducts([data[0], ...products]);
-        }
+        if (data && data.length > 0) setProducts([data[0], ...products]);
       }
       setIsModalOpen(false);
     } catch (error) {
@@ -192,109 +182,153 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleAddCategory = () => {
-    if (newCategory.trim() && !categories.includes(newCategory)) {
-      setCategories([...categories, newCategory]);
-      setFormData({ ...formData, category: newCategory });
-      setNewCategory('');
-      setIsAddingCategory(false);
+  const addCategory = () => { if (newCatInput.trim() && !categoryMap[newCatInput]) { setCategoryMap({ ...categoryMap, [newCatInput.trim()]: [] }); setNewCatInput(''); } };
+  const deleteCategory = (cat) => {
+    if (window.confirm(`Delete entire '${cat}' category?`)) {
+      const newMap = { ...categoryMap }; delete newMap[cat]; setCategoryMap(newMap);
+      if (managingSubCategoryFor === cat) setManagingSubCategoryFor(null);
+      if (formData.category === cat) {
+        const nextCat = Object.keys(newMap)[0] || '';
+        setFormData({ ...formData, category: nextCat, subCategory: newMap[nextCat]?.[0] || '' });
+      }
+    }
+  };
+  const editCategory = (oldCat) => {
+    const newCat = window.prompt("Enter new category name:", oldCat);
+    if (newCat && newCat.trim() !== '' && newCat !== oldCat && !categoryMap[newCat]) {
+      const newMap = { ...categoryMap }; newMap[newCat] = newMap[oldCat]; delete newMap[oldCat]; setCategoryMap(newMap);
+      if (managingSubCategoryFor === oldCat) setManagingSubCategoryFor(newCat);
+      if (formData.category === oldCat) setFormData({ ...formData, category: newCat });
+    }
+  };
+  const addSubCategory = () => {
+    if (newSubCatInput.trim() && managingSubCategoryFor) {
+      const updatedSubs = [...categoryMap[managingSubCategoryFor], newSubCatInput.trim()];
+      setCategoryMap({ ...categoryMap, [managingSubCategoryFor]: updatedSubs }); setNewSubCatInput('');
+    }
+  };
+  const deleteSubCategory = (subCat) => {
+    if (managingSubCategoryFor) {
+      const updatedSubs = categoryMap[managingSubCategoryFor].filter(s => s !== subCat);
+      setCategoryMap({ ...categoryMap, [managingSubCategoryFor]: updatedSubs });
+      if (formData.subCategory === subCat) setFormData({ ...formData, subCategory: updatedSubs[0] || '' });
+    }
+  };
+  const editSubCategory = (oldSubCat) => {
+    const newSubCat = window.prompt("Enter new sub-category name:", oldSubCat);
+    if (newSubCat && newSubCat.trim() !== '' && newSubCat !== oldSubCat && managingSubCategoryFor) {
+      const updatedSubs = categoryMap[managingSubCategoryFor].map(s => s === oldSubCat ? newSubCat : s);
+      setCategoryMap({ ...categoryMap, [managingSubCategoryFor]: updatedSubs });
+      if (formData.subCategory === oldSubCat) setFormData({ ...formData, subCategory: newSubCat });
     }
   };
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ status: newStatus })
-        .eq('id', orderId);
-
+      const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
       if (error) throw error;
-
       setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-      if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder({ ...selectedOrder, status: newStatus });
-      }
-    } catch (error) {
-      alert("Failed to update order status.");
-    }
+      if (selectedOrder && selectedOrder.id === orderId) setSelectedOrder({ ...selectedOrder, status: newStatus });
+    } catch (error) { alert("Failed to update order status."); }
   };
-
   const handleDeleteOrder = async (orderId) => {
-    if (window.confirm("Are you sure you want to permanently delete this order? This action will free up database storage.")) {
+    if (window.confirm("Are you sure you want to permanently delete this order?")) {
       try {
-        const { error } = await supabase
-          .from('orders')
-          .delete()
-          .eq('id', orderId);
-
+        const { error } = await supabase.from('orders').delete().eq('id', orderId);
         if (error) throw error;
-        
-        setOrders(orders.filter(o => o.id !== orderId));
-        alert("Order deleted successfully!");
-      } catch (error) {
-        alert("Error deleting order from database.");
-      }
+        setOrders(orders.filter(o => o.id !== orderId)); alert("Order deleted successfully!");
+      } catch (error) { alert("Error deleting order from database."); }
     }
   };
-
   const handlePrint = () => window.print();
-
   const handleWhatsAppNotify = (order) => {
     const message = `Hi ${order.customer},%0A%0AThanks for choosing *THREADZS*! 👕%0AYour Order ${order.id} is currently: *${order.status}*.%0A%0AWe will keep you updated. Get ready for the drip! ✨`;
     window.open(`https://wa.me/91${order.phone}?text=${message}`, '_blank');
   };
 
   const handleHeroImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    const data = new FormData();
-    data.append('file', file);
-    data.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-    data.append('cloud_name', CLOUDINARY_CLOUD_NAME);
-
+    const file = e.target.files[0]; if (!file) return;
+    setIsUploading(true); const data = new FormData(); data.append('file', file); data.append('upload_preset', CLOUDINARY_UPLOAD_PRESET); data.append('cloud_name', CLOUDINARY_CLOUD_NAME);
     try {
       const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: data });
-      const uploadedImage = await response.json();
-      setHeroBanner({ ...heroBanner, image: uploadedImage.secure_url });
-    } catch (error) {
-      alert("Hero Image upload failed!");
-    } finally {
-      setIsUploading(false);
-    }
+      const uploadedImage = await response.json(); setHeroBanner({ ...heroBanner, image: uploadedImage.secure_url });
+    } catch (error) { alert("Hero Image upload failed!"); } finally { setIsUploading(false); }
   };
-
-  const handleHeroBannerChange = (e) => {
-    setHeroBanner({ ...heroBanner, [e.target.name]: e.target.value });
-  };
-
+  const handleHeroBannerChange = (e) => setHeroBanner({ ...heroBanner, [e.target.name]: e.target.value });
   const handleHeroSubmit = async (e) => {
     e.preventDefault();
     try {
       setIsUploading(true);
-      const { error } = await supabase
-        .from('hero_banner')
-        .update({
-          heading: heroBanner.heading,
-          subtext: heroBanner.subtext,
-          tagline: heroBanner.tagline,
-          image: heroBanner.image
-        })
-        .eq('id', 1);
+      const { error } = await supabase.from('hero_banner').update({ heading: heroBanner.heading, subtext: heroBanner.subtext, tagline: heroBanner.tagline, image: heroBanner.image }).eq('id', 1);
+      if (error) throw error; alert("Hero Section Updated Successfully in Database! 🔥");
+    } catch (error) { console.error(error); alert("Error saving hero banner to database."); } finally { setIsUploading(false); }
+  };
+// --- NEW: IG IMAGE AUTO UPLOAD HANDLER ---
+  const handleIgImageUpload = async (e) => {
+    const file = e.target.files[0]; 
+    if (!file) return;
+    setIsUploading(true); 
+    const data = new FormData(); 
+    data.append('file', file); 
+    data.append('upload_preset', CLOUDINARY_UPLOAD_PRESET); 
+    data.append('cloud_name', CLOUDINARY_CLOUD_NAME);
+    try {
+      const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: data });
+      const uploadedImage = await response.json(); 
+      // Link-a automatic aah state-la set pannidurom
+      setIgFormData({ ...igFormData, image_url: uploadedImage.secure_url });
+    } catch (error) { 
+      alert("Image upload failed!"); 
+    } finally { 
+      setIsUploading(false); 
+    }
+  };
+  // --- DB FIXED: IG FEED HANDLERS ---
+  const handleIgFormChange = (e) => {
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setIgFormData({ ...igFormData, [e.target.name]: value });
+  };
 
+  const handleIgSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setIsSubmittingIg(true);
+      
+      // ADDED BACK image_url so DB won't throw Error 23502 (Not-null constraint)
+      const payload = {
+        image_url: igFormData.image_url,
+        post_link: igFormData.post_link,
+        likes: igFormData.likes,
+        is_reel: igFormData.is_reel
+      };
+
+      const { data, error } = await supabase.from('ig_feed').insert([payload]).select();
       if (error) throw error;
-      alert("Hero Section Updated Successfully in Database! 🔥");
+      if (data && data.length > 0) {
+        setIgFeedData([data[0], ...igFeedData]);
+        setIgFormData({ image_url: '', post_link: '', likes: '', is_reel: false });
+        alert("Instagram Link Added Successfully! 🔥");
+      }
     } catch (error) {
       console.error(error);
-      alert("Error saving hero banner to database.");
+      alert("Error adding post link to Database.");
     } finally {
-      setIsUploading(false);
+      setIsSubmittingIg(false);
     }
   };
 
+  const handleIgDelete = async (id) => {
+    if(window.confirm("Delete this post from the homepage feed?")) {
+      try {
+        const { error } = await supabase.from('ig_feed').delete().eq('id', id);
+        if (error) throw error;
+        setIgFeedData(igFeedData.filter(post => post.id !== id));
+      } catch (error) {
+        alert("Error deleting post.");
+      }
+    }
+  };
 
-  // ================= TAB CONTENT RENDERER =================
   const renderContent = () => {
     if (activeTab === 'dashboard') {
       const totalRevenue = orders.reduce((acc, o) => {
@@ -405,7 +439,12 @@ const AdminDashboard = () => {
                     <tr key={p.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="p-4 border-b border-gray-50"><div className="w-12 h-16 rounded-lg overflow-hidden border border-gray-200 bg-gray-100">{coverImage && <img src={coverImage} alt={p.name} className="w-full h-full object-cover" />}</div></td>
                       <td className="p-4 font-bold text-gray-900 border-b border-gray-50"><div><p className="font-black">{p.name}</p><p className="text-xs text-gray-400 font-medium truncate max-w-[250px] mt-0.5">{p.description}</p></div></td>
-                      <td className="p-4 border-b border-gray-50"><span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider">{p.category}</span></td>
+                      <td className="p-4 border-b border-gray-50">
+                        <div className="flex flex-col">
+                          <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider w-max">{p.category}</span>
+                          {p.sub_category && <span className="text-[10px] font-bold text-gray-400 uppercase mt-1 pl-1 flex items-center"><ChevronRight size={10} className="mr-0.5"/> {p.sub_category}</span>}
+                        </div>
+                      </td>
                       
                       <td className="p-4 border-b border-gray-50">
                         <div className="flex flex-col">
@@ -541,13 +580,96 @@ const AdminDashboard = () => {
       );
     }
 
+    if (activeTab === 'instagram') {
+      return (
+        <div className="animate-in fade-in duration-300">
+          <h1 className="text-2xl font-black mb-8 text-gray-900 uppercase tracking-wider">Instagram Feed Manager</h1>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-white border border-gray-100 rounded-3xl shadow-sm p-6">
+              <h2 className="font-black text-lg text-gray-900 mb-6 flex items-center gap-2 uppercase tracking-wider">
+                <Plus size={20} className="text-pink-600" /> Add New IG Post
+              </h2>
+              <form onSubmit={handleIgSubmit} className="space-y-4">
+                
+                {/* --- AUTO UPLOAD IMAGE FIELD --- */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Upload Instagram Image</label>
+                  <div className="flex gap-4 items-center">
+                    {igFormData.image_url ? (
+                      <div className="w-20 h-24 rounded-xl overflow-hidden border-2 border-gray-200 flex-shrink-0 relative shadow-sm">
+                        <img src={igFormData.image_url} alt="IG Preview" className="w-full h-full object-cover" />
+                        <button type="button" onClick={() => setIgFormData({...igFormData, image_url: ''})} className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full shadow-md hover:bg-red-700 transition-colors"><X size={12} /></button>
+                      </div>
+                    ) : (
+                      <label className={`flex-1 flex flex-col items-center justify-center h-24 border-2 border-dashed border-gray-300 rounded-xl transition-all ${isUploading ? 'bg-gray-100 cursor-not-allowed' : 'bg-pink-50 hover:bg-pink-100 cursor-pointer'}`}>
+                        {isUploading ? <Loader2 className="w-6 h-6 text-pink-600 animate-spin mb-2" /> : <UploadCloud className="w-6 h-6 text-pink-500 mb-2" />}
+                        <span className="text-xs font-bold text-gray-600">{isUploading ? "Uploading..." : "Click to Upload Image"}</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={handleIgImageUpload} disabled={isUploading} />
+                      </label>
+                    )}
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Instagram Post Link</label>
+                  <input type="url" name="post_link" required value={igFormData.post_link} onChange={handleIgFormChange} placeholder="https://www.instagram.com/p/..." className="w-full border-2 border-gray-200 p-3 rounded-xl focus:outline-none focus:border-pink-500 font-medium text-gray-900 text-sm" />
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Likes Count (e.g. 1.2k)</label>
+                  <input type="text" name="likes" value={igFormData.likes} onChange={handleIgFormChange} placeholder="500" className="w-full border-2 border-gray-200 p-3 rounded-xl focus:outline-none focus:border-pink-500 font-bold text-gray-900 text-sm" />
+                </div>
+                <div className="flex items-center gap-3 pt-2">
+                  <input type="checkbox" id="is_reel" name="is_reel" checked={igFormData.is_reel} onChange={handleIgFormChange} className="w-5 h-5 accent-pink-600 cursor-pointer" />
+                  <label htmlFor="is_reel" className="text-sm font-bold text-gray-700 cursor-pointer">Is this a Reel? (Adds play icon)</label>
+                </div>
+                <button type="submit" disabled={isSubmittingIg || isUploading} className="w-full bg-gradient-to-r from-pink-500 to-orange-400 text-white py-4 rounded-xl font-black uppercase tracking-widest hover:opacity-90 transition-opacity mt-4 shadow-md disabled:opacity-50">
+                  {isSubmittingIg ? "Adding Post..." : "Publish to Homepage"}
+                </button>
+              </form>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-3xl shadow-sm p-6 overflow-hidden flex flex-col h-full">
+              <h2 className="font-black text-lg text-gray-900 mb-6 uppercase tracking-wider">Live Homepage Feed</h2>
+              <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+                {igFeedData.length === 0 ? (
+                  <p className="text-center text-gray-400 font-bold py-10 border-2 border-dashed rounded-xl border-gray-200">No posts added yet.</p>
+                ) : (
+                  igFeedData.map(post => (
+                    <div key={post.id} className="flex gap-4 p-3 border border-gray-200 rounded-2xl items-center bg-gray-50">
+                      
+                      <div className="w-16 h-20 bg-gray-200 rounded-xl overflow-hidden flex-shrink-0 relative flex flex-col items-center justify-center border border-gray-200">
+                        {post.image_url ? (
+                          <img src={post.image_url} alt="IG Post" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-gray-400 text-[10px] font-bold">No Img</span>
+                        )}
+                        {post.is_reel && <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute top-1 right-1 drop-shadow-md"><polygon points="6 3 20 12 6 21 6 3"/></svg>}
+                      </div>
+                      
+                      <div className="flex-1 overflow-hidden">
+                        <p className="text-sm font-black text-gray-900 truncate">Likes: {post.likes || 0}</p>
+                        <a href={post.post_link} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-500 hover:text-blue-700 hover:underline truncate block w-full">View Link</a>
+                      </div>
+                      <button onClick={() => handleIgDelete(post.id)} className="p-2 bg-red-100 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-colors">
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return <div className="text-gray-500 font-medium text-center py-20">Module Under Development</div>;
   };
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-sans print:h-auto print:block">
       
-      {/* ================= SIDEBAR ================= */}
       <aside className={`bg-black text-white w-64 flex-shrink-0 transition-all duration-300 z-30 flex flex-col print:hidden ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full absolute md:relative md:w-20 md:translate-x-0'}`}>
         <div className="h-20 flex items-center justify-between px-6 border-b border-gray-800">
           <h2 className={`font-black text-xl tracking-widest text-red-500 overflow-hidden whitespace-nowrap ${!isSidebarOpen && 'md:hidden'}`}>THREADZS<span className="text-white text-sm block tracking-normal">ADMIN</span></h2>
@@ -558,11 +680,14 @@ const AdminDashboard = () => {
           <button onClick={() => setActiveTab('products')} className={`flex items-center gap-4 px-4 py-3 rounded-xl font-bold w-full transition-colors ${activeTab === 'products' ? 'bg-red-600 text-white' : 'text-gray-400 hover:bg-gray-900 hover:text-white'}`}><ShoppingBag size={20} className="flex-shrink-0" /><span className={`whitespace-nowrap ${!isSidebarOpen && 'md:hidden'}`}>Products</span></button>
           <button onClick={() => setActiveTab('orders')} className={`flex items-center gap-4 px-4 py-3 rounded-xl font-bold w-full transition-colors ${activeTab === 'orders' ? 'bg-red-600 text-white' : 'text-gray-400 hover:bg-gray-900 hover:text-white'}`}><ShoppingCart size={20} className="flex-shrink-0" /><span className={`whitespace-nowrap ${!isSidebarOpen && 'md:hidden'}`}>Orders</span></button>
           <button onClick={() => setActiveTab('hero')} className={`flex items-center gap-4 px-4 py-3 rounded-xl font-bold w-full transition-colors ${activeTab === 'hero' ? 'bg-red-600 text-white' : 'text-gray-400 hover:bg-gray-900 hover:text-white'}`}><MonitorPlay size={20} className="flex-shrink-0" /><span className={`whitespace-nowrap ${!isSidebarOpen && 'md:hidden'}`}>Hero Banner</span></button>
+          <button onClick={() => setActiveTab('instagram')} className={`flex items-center gap-4 px-4 py-3 rounded-xl font-bold w-full transition-colors ${activeTab === 'instagram' ? 'bg-gradient-to-r from-pink-500 to-orange-400 text-white' : 'text-gray-400 hover:bg-gray-900 hover:text-white'}`}>
+            <LayoutDashboard size={20} className="flex-shrink-0" />
+            <span className={`whitespace-nowrap ${!isSidebarOpen && 'md:hidden'}`}>IG Manager</span>
+          </button>
         </nav>
         <div className="p-4 border-t border-gray-800 flex-shrink-0"><button className="flex items-center gap-4 px-4 py-3 text-red-400 hover:bg-gray-900 hover:text-red-300 rounded-xl font-bold w-full transition-colors overflow-hidden"><LogOut size={20} className="flex-shrink-0" /><span className={`whitespace-nowrap ${!isSidebarOpen && 'md:hidden'}`}>Logout</span></button></div>
       </aside>
 
-      {/* ================= MAIN CONTENT ================= */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative print:h-auto print:block">
         {isSidebarOpen && <div className="absolute inset-0 bg-black/50 z-20 md:hidden print:hidden" onClick={() => setIsSidebarOpen(false)}></div>}
         <header className="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-6 lg:px-10 flex-shrink-0 z-10 print:hidden">
@@ -572,10 +697,9 @@ const AdminDashboard = () => {
         <div className={`flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 ${isOrderModalOpen ? 'print:hidden' : ''}`}>{renderContent()}</div>
       </main>
 
-      {/* ================= ADD / EDIT PRODUCT MODAL ================= */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
               <h2 className="text-xl font-black uppercase tracking-wider text-gray-900">{editingId ? 'Edit Product' : 'Add New Product'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-red-600 transition-colors p-1 bg-gray-100 rounded-full"><XCircle size={24} /></button>
@@ -603,13 +727,29 @@ const AdminDashboard = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Product Name</label><input type="text" name="name" required value={formData.name} onChange={handleInputChange} placeholder="E.g. Oversized Drop Tee" className="w-full border-2 border-gray-200 p-4 rounded-xl focus:outline-none focus:border-black font-bold text-gray-900" /></div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Category</label>
-                  {!isAddingCategory ? (
-                    <div className="flex gap-2"><select name="category" value={formData.category} onChange={handleInputChange} className="w-full border-2 border-gray-200 p-4 rounded-xl focus:outline-none focus:border-black font-bold text-gray-900 bg-white appearance-none">{categories.map((cat, idx) => <option key={idx} value={cat}>{cat}</option>)}</select><button type="button" onClick={() => setIsAddingCategory(true)} className="bg-black text-white px-4 rounded-xl hover:bg-gray-800 flex items-center justify-center"><Plus size={20} /></button></div>
-                  ) : (
-                    <div className="flex gap-2"><input type="text" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="New Category" autoFocus className="w-full border-2 border-red-200 bg-red-50 p-4 rounded-xl focus:outline-none focus:border-red-500 font-bold text-gray-900" /><button type="button" onClick={handleAddCategory} className="bg-green-600 text-white px-4 rounded-xl font-bold">Add</button><button type="button" onClick={() => setIsAddingCategory(false)} className="bg-gray-200 text-gray-600 px-4 rounded-xl"><X size={20}/></button></div>
-                  )}
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Category</label>
+                    <div className="flex gap-2">
+                      <select name="category" value={formData.category} onChange={handleInputChange} className="w-full border-2 border-gray-200 p-4 rounded-xl focus:outline-none focus:border-black font-bold text-gray-900 bg-white appearance-none">
+                        {Object.keys(categoryMap).map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                      </select>
+                      <button type="button" onClick={() => setIsCategoryManagerOpen(true)} className="bg-gray-100 text-gray-600 px-4 rounded-xl hover:bg-gray-200 flex items-center justify-center transition-colors">
+                        <Settings size={20} />
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Sub-Category</label>
+                    <select name="subCategory" value={formData.subCategory} onChange={handleInputChange} className="w-full border-2 border-gray-200 p-4 rounded-xl focus:outline-none focus:border-black font-bold text-gray-900 bg-white appearance-none">
+                      {categoryMap[formData.category]?.length ? (
+                        categoryMap[formData.category].map((sub) => <option key={sub} value={sub}>{sub}</option>)
+                      ) : (
+                        <option value="">No Sub-Cats</option>
+                      )}
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -652,7 +792,56 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* LIVE ORDER DETAILED VIEW MODAL */}
+      {isCategoryManagerOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in print:hidden">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl relative border border-gray-100">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-black uppercase tracking-wider text-lg text-gray-900">Category Manager</h3>
+              <button onClick={() => { setIsCategoryManagerOpen(false); setManagingSubCategoryFor(null); }} className="text-gray-400 hover:text-red-600 transition-colors p-1 bg-gray-100 rounded-full"><XCircle size={24} /></button>
+            </div>
+
+            <div className="space-y-3 max-h-60 overflow-y-auto mb-6 pr-2">
+              {Object.keys(categoryMap).map(cat => (
+                <div key={cat} className={`flex justify-between items-center p-3 rounded-xl border transition-all ${managingSubCategoryFor === cat ? 'bg-black text-white border-black' : 'bg-gray-50 border-gray-200 hover:border-gray-300 text-gray-800'}`}>
+                  <span className="font-bold cursor-pointer flex-1" onClick={() => setManagingSubCategoryFor(cat)}>{cat}</span>
+                  <div className="flex gap-2">
+                    <button onClick={() => editCategory(cat)} className={`p-1.5 rounded-md ${managingSubCategoryFor === cat ? 'bg-gray-800 text-white hover:text-blue-400' : 'bg-white text-blue-500 hover:bg-blue-50'}`}><Edit size={14}/></button>
+                    <button onClick={() => deleteCategory(cat)} className={`p-1.5 rounded-md ${managingSubCategoryFor === cat ? 'bg-gray-800 text-white hover:text-red-400' : 'bg-white text-red-500 hover:bg-red-50'}`}><Trash2 size={14}/></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2 mb-6 border-b border-gray-100 pb-6">
+              <input type="text" value={newCatInput} onChange={e => setNewCatInput(e.target.value)} placeholder="New Main Category..." className="flex-1 border-2 border-gray-200 p-3 rounded-xl focus:outline-none focus:border-black font-bold text-gray-900 text-sm" />
+              <button onClick={addCategory} className="bg-black text-white px-4 rounded-xl hover:bg-gray-800 transition-colors"><Plus size={20}/></button>
+            </div>
+
+            {managingSubCategoryFor ? (
+              <div className="animate-in slide-in-from-bottom-2">
+                <h4 className="font-black text-xs text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-1">Sub-Categories for <span className="text-red-600 bg-red-50 px-2 py-0.5 rounded-md">{managingSubCategoryFor}</span></h4>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {categoryMap[managingSubCategoryFor].length === 0 && <span className="text-xs text-gray-400 font-bold">No sub-categories yet.</span>}
+                  {categoryMap[managingSubCategoryFor].map(sub => (
+                    <div key={sub} className="bg-gray-100 text-gray-800 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-2 border border-gray-200">
+                      {sub}
+                      <button onClick={() => editSubCategory(sub)} className="text-blue-500 hover:text-blue-700"><Edit size={12}/></button>
+                      <button onClick={() => deleteSubCategory(sub)} className="text-red-500 hover:text-red-700"><X size={14}/></button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input type="text" value={newSubCatInput} onChange={e => setNewSubCatInput(e.target.value)} placeholder={`Add to ${managingSubCategoryFor}...`} className="flex-1 border-2 border-gray-200 p-2.5 rounded-xl focus:outline-none focus:border-black font-bold text-gray-900 text-sm" />
+                  <button onClick={addSubCategory} className="bg-gray-200 text-gray-800 px-4 rounded-xl hover:bg-gray-300 font-bold text-sm">Add</button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-center text-xs font-bold text-gray-400 italic">Click on a category above to manage its sub-categories.</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {isOrderModalOpen && selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in print:static print:bg-white print:p-0 print:block">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-gray-100 print:shadow-none print:border-none print:max-h-none print:overflow-visible print:w-full print:max-w-full print:rounded-none">
@@ -692,14 +881,10 @@ const AdminDashboard = () => {
                           <td className="p-4 text-black">
                             <div className="flex flex-col">
                               <span className="font-black text-base">{item.name}</span>
-                              
-                              {/* --- UPDATED: Dynamic Multi-Design Attachments Downloader Panel for Admin --- */}
                               {item.isCustom && (
                                 <div className="mt-4 bg-gray-50 p-3.5 rounded-2xl border border-gray-200 max-w-lg print:border-black print:bg-white">
                                   <p className="text-[10px] font-black uppercase text-red-600 tracking-widest mb-3 print:text-black">🔥 Custom Print Files Attachment</p>
                                   <div className="flex flex-wrap gap-3">
-                                    
-                                    {/* Map Front independent placements */}
                                     {item.frontDesigns && Object.entries(item.frontDesigns).map(([placement, url]) => (
                                       url && (
                                         <div key={placement} className="flex flex-col items-center bg-white border border-gray-200 rounded-xl p-2 w-24 text-center shadow-sm print:shadow-none print:border-black">
@@ -713,8 +898,6 @@ const AdminDashboard = () => {
                                         </div>
                                       )
                                     ))}
-
-                                    {/* Map Back side attachment file */}
                                     {item.backDesign && (
                                       <div className="flex flex-col items-center bg-white border border-gray-200 rounded-xl p-2 w-24 text-center shadow-sm print:shadow-none print:border-black">
                                         <div className="w-16 h-20 bg-gray-50 rounded-lg overflow-hidden border border-gray-100 flex items-center justify-center">
@@ -724,7 +907,6 @@ const AdminDashboard = () => {
                                         <a href={item.backDesign} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-blue-600 hover:underline mt-1 print:hidden">Open Img</a>
                                       </div>
                                     )}
-
                                   </div>
                                 </div>
                               )}
