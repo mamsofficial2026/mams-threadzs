@@ -309,7 +309,7 @@ const Home = () => {
       )}
 
       {/* ================= FLOATING WHATSAPP BUTTON ================= */}
-      <a href="https://wa.me/910000000000" target="_blank" rel="noreferrer" className="fixed bottom-6 right-6 bg-[#25D366] text-white p-3 rounded-full shadow-2xl hover:scale-110 transition-transform z-50 flex items-center justify-center">
+      <a href="https://wa.me/919043241335" target="_blank" rel="noreferrer" className="fixed bottom-6 right-6 bg-[#25D366] text-white p-3 rounded-full shadow-2xl hover:scale-110 transition-transform z-50 flex items-center justify-center">
         <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" className="w-8 h-8 md:w-10 md:h-10" />
       </a>
 
