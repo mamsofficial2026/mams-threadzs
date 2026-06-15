@@ -83,7 +83,7 @@ const Checkout = () => {
       form.method = 'POST';
       form.action = PAYU_BASE_URL;
 
-      // URL where PayU will send the user after payment (You need to create these pages next bro!)
+      // URL where PayU will send the user after payment
       const successUrl = "http://localhost:5173/payment-success";
       const failureUrl = "http://localhost:5173/payment-failed";
 
@@ -212,7 +212,18 @@ const Checkout = () => {
             
             <div className="space-y-6 mb-6 max-h-[400px] overflow-y-auto scrollbar-hide pr-2">
               {checkoutItems.map((item, index) => {
-                const displayImage = (item.images && item.images.length > 0) ? item.images[0] : item.image;
+                
+                // 🔥 NEW: Check for selected color and find its specific image
+                const chosenColorName = item.color || item.selected_color;
+                let displayImage = (item.images && item.images.length > 0) ? item.images[0] : item.image;
+                
+                if (chosenColorName && item.colors && item.colors.length > 0) {
+                  const matchedColorObj = item.colors.find(c => c.name === chosenColorName);
+                  if (matchedColorObj && matchedColorObj.images && matchedColorObj.images.length > 0) {
+                    displayImage = matchedColorObj.images[0]; // Exact color image!
+                  }
+                }
+
                 return (
                   <div key={index} className="flex gap-4 items-center">
                     <div className="w-16 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
@@ -220,7 +231,11 @@ const Checkout = () => {
                     </div>
                     <div className="flex-1">
                       <h3 className="text-sm font-black text-gray-900 leading-tight">{item.name}</h3>
-                      <p className="text-xs font-bold text-gray-500 mt-1">Size: {item.size || 'M'} | Qty: {item.quantity || 1}</p>
+                      {/* 🔥 NEW: Showing selected Color Name with Size */}
+                      <p className="text-xs font-bold text-gray-500 mt-1">
+                        Size: {item.size || 'M'} | Qty: {item.quantity || 1} 
+                        {chosenColorName ? ` | Color: ${chosenColorName}` : ''}
+                      </p>
                       <p className="text-sm font-black text-red-600 mt-1">₹{parseInt(item.price) * (item.quantity || 1)}</p>
                     </div>
                   </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
-  Check, Plus, Minus, Copy, MessageCircle, Star, ChevronDown, ChevronUp 
+  Check, Plus, Minus, Copy, MessageCircle, Star, ChevronDown, ChevronUp, Share2
 } from 'lucide-react'; 
 import { useCart } from '../context/CartContext';
 import { useProducts } from '../context/ProductContext';
@@ -15,7 +15,6 @@ const ProductDetail = () => {
   const { products } = useProducts();
 
   const [selectedSize, setSelectedSize] = useState('M');
-  // --- NEW: STATE FOR COLOR VARIANT ---
   const [selectedColor, setSelectedColor] = useState(null);
   
   const [quantity, setQuantity] = useState(1);
@@ -30,6 +29,8 @@ const ProductDetail = () => {
   const [reviewerName, setReviewerName] = useState('');
   const [reviewText, setReviewText] = useState('');
   const [reviews, setReviews] = useState([]);
+
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -62,11 +63,9 @@ const ProductDetail = () => {
 
   const product = products.find(p => p.id === parseInt(id));
 
-  // --- UPDATED: DYNAMIC INITIALIZATION FOR COLORS ---
   useEffect(() => {
     if (product) {
       if (product.colors && product.colors.length > 0) {
-        // Setup initial color if variants exist
         const initialColor = product.colors[0];
         setSelectedColor(initialColor);
         const initialImg = (initialColor.images && initialColor.images.length > 0) 
@@ -74,7 +73,6 @@ const ProductDetail = () => {
             : (product.image || product.images?.[0]);
         setMainImage(initialImg);
       } else {
-        // Fallback for older products without color variants
         const initialImg = (product.images && product.images.length > 0) ? product.images[0] : product.image;
         setMainImage(initialImg);
       }
@@ -85,13 +83,12 @@ const ProductDetail = () => {
     }
   }, [product]);
 
-  // --- UPDATED: DYNAMIC GALLERY FILTERING BASED ON COLOR ---
   let galleryImages = [];
   if (product) {
     if (selectedColor && selectedColor.images && selectedColor.images.length > 0) {
-      galleryImages = selectedColor.images; // Show ONLY selected color images
+      galleryImages = selectedColor.images; 
     } else if (product.images && product.images.length > 0) {
-      galleryImages = product.images; // Fallback to all images
+      galleryImages = product.images; 
     } else {
       galleryImages = [
         product.image, 
@@ -115,13 +112,11 @@ const ProductDetail = () => {
     }, 200);
   };
 
-  // --- NEW: COLOR CHANGE HANDLER ---
   const handleColorSwitch = (colorVariant) => {
     if (selectedColor?.name === colorVariant.name) return;
     setFade(true);
     setTimeout(() => {
       setSelectedColor(colorVariant);
-      // Auto-switch main image to the first image of the new color variant
       const newMain = (colorVariant.images && colorVariant.images.length > 0) 
           ? colorVariant.images[0] 
           : mainImage;
@@ -138,7 +133,6 @@ const ProductDetail = () => {
   };
 
   const handleAddToCart = () => {
-    // Optionally attaching the selected color name to the product before cart 
     const productToAdd = { ...product, selected_color: selectedColor?.name };
     for(let i=0; i<quantity; i++) {
       addToCart(productToAdd, selectedSize);
@@ -192,6 +186,47 @@ const ProductDetail = () => {
     }
   };
 
+  // ================= FIXED: PROPER LINK FORMAT SHARE LOGIC =================
+  const shareUrl = window.location.href;
+  const shareTitle = `Hey! Check out this ${product.name} at THREADZS! 🔥`;
+
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'THREADZS Drop',
+          text: shareTitle,
+          url: shareUrl, // The OS automatically formats this as a rich link
+        });
+      } catch (error) {
+        console.log('Error sharing:', error);
+      }
+    } else {
+      handleCopyLink();
+    }
+  };
+
+  const handleWhatsAppShare = () => {
+    // 🔥 \n\n separates the text from the link so WhatsApp creates a preview card!
+    const whatsappText = `${shareTitle}\n\n${shareUrl}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappText)}`, '_blank');
+  };
+
+  const handleFacebookShare = () => {
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
+  };
+
+  const handleTwitterShare = () => {
+    const twitterText = `${shareTitle}\n\n`;
+    window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(twitterText)}`, '_blank');
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full bg-white select-none">
       
@@ -200,7 +235,6 @@ const ProductDetail = () => {
         {/* ================= LEFT: AMAZON STYLE IMAGE GALLERY ================= */}
         <div className="flex-[1.2] flex flex-col-reverse md:flex-row gap-4 h-fit lg:sticky lg:top-24 mb-6 lg:mb-0 relative z-10">
           
-          {/* Thumbnails */}
           <div className="flex md:flex-col gap-3 overflow-x-auto md:overflow-visible scrollbar-hide py-2 md:py-0">
             {galleryImages.map((img, idx) => (
               <button 
@@ -217,7 +251,6 @@ const ProductDetail = () => {
             ))}
           </div>
 
-          {/* Main Large Image */}
           <div className="flex-1 bg-[#f5f5f5] rounded-[2rem] overflow-hidden aspect-[4/5] md:aspect-auto md:h-[600px] lg:h-[700px] relative shadow-inner border border-gray-100">
             <img 
               src={mainImage} 
@@ -267,7 +300,6 @@ const ProductDetail = () => {
             )}
           </div>
 
-          {/* --- UPDATED: DYNAMIC COLOR CIRCLES --- */}
           <div className="mb-8">
             <h3 className="font-black text-xs uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-2">
               Color: <span className="text-black">{selectedColor ? selectedColor.name : 'Standard Base'}</span>
@@ -287,14 +319,12 @@ const ProductDetail = () => {
                       style={{ backgroundColor: color.hex || '#000000' }}
                       title={color.name}
                     >
-                       {/* Inner shadow to make light colors pop */}
                        <div className="absolute inset-0 rounded-full shadow-inner pointer-events-none"></div>
                     </button>
                   );
                 })}
               </div>
             ) : (
-              // Fallback if no colors added yet
               <div className="flex flex-col items-start">
                 <div className="w-10 h-10 rounded-full border border-gray-200 cursor-pointer overflow-hidden shadow-sm ring-2 ring-offset-2 ring-black">
                   <img src={mainImage} className="w-full h-full object-cover" alt="Color preview" />
@@ -303,7 +333,6 @@ const ProductDetail = () => {
             )}
           </div>
           
-          {/* Sizes Area */}
           <div className="mb-8">
             <div className="flex justify-between items-center mb-3">
               <h3 className="font-black text-xs uppercase tracking-widest text-gray-500">Select Size:</h3>
@@ -322,7 +351,6 @@ const ProductDetail = () => {
             </div>
           </div>
 
-          {/* Quantity Block */}
           <div className="mb-8">
             <h3 className="font-black text-xs uppercase tracking-widest text-gray-500 mb-3">Quantity:</h3>
             <div className="inline-flex border-2 border-gray-200 h-12 rounded-xl overflow-hidden bg-white shadow-sm">
@@ -338,7 +366,6 @@ const ProductDetail = () => {
             </div>
           </div>
 
-          {/* Action Buttons Layout */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <button 
               onClick={handleAddToCart} 
@@ -368,11 +395,21 @@ const ProductDetail = () => {
           <div className="flex items-center gap-4 mb-10">
             <h3 className="font-black text-xs uppercase tracking-widest text-gray-500">Share:</h3>
             <div className="flex gap-4 items-center">
-              <MessageCircle size={20} className="cursor-pointer text-gray-400 hover:text-green-500 transition-colors" />
-              <svg className="cursor-pointer text-gray-400 hover:text-blue-600 transition-colors" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
-              <svg className="cursor-pointer text-gray-400 hover:text-black transition-colors" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4l11.733 16h4.267l-11.733 -16z"/><path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772"/></svg>
-              <svg className="cursor-pointer text-gray-400 hover:text-pink-600 transition-colors" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
-              <Copy size={20} className="cursor-pointer text-gray-400 hover:text-black transition-colors" />
+              
+              <button onClick={handleNativeShare} className="bg-gray-100 hover:bg-red-50 text-gray-800 hover:text-red-600 p-2 rounded-full transition-colors flex items-center justify-center shadow-sm border border-gray-200" title="Share via Mobile Options">
+                <Share2 size={16} />
+              </button>
+
+              <MessageCircle onClick={handleWhatsAppShare} size={22} className="cursor-pointer text-gray-400 hover:text-[#25D366] transition-colors" title="Share on WhatsApp" />
+              
+              <svg onClick={handleFacebookShare} className="cursor-pointer text-gray-400 hover:text-[#1877F2] transition-colors" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" title="Share on Facebook"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+              
+              <svg onClick={handleTwitterShare} className="cursor-pointer text-gray-400 hover:text-black transition-colors" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" title="Share on X"><path d="M4 4l11.733 16h4.267l-11.733 -16z"/><path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772"/></svg>
+              
+              <div className="relative flex items-center">
+                <Copy onClick={handleCopyLink} size={20} className={`cursor-pointer transition-colors ${copied ? 'text-green-500' : 'text-gray-400 hover:text-black'}`} title="Copy Link" />
+                {copied && <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-[10px] font-bold px-2 py-1 rounded shadow-md whitespace-nowrap z-10 animate-in slide-in-from-bottom-1">Copied!</span>}
+              </div>
             </div>
           </div>
 
