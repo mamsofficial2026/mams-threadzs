@@ -49,7 +49,7 @@ const Footer = () => {
           <div>
             <h3 className="font-black uppercase tracking-widest text-sm mb-6">Support</h3>
             <ul className="space-y-3 text-gray-400 text-sm font-medium">
-              <li><a href="#" className="hover:text-red-500 transition-colors">Track Order</a></li>
+              <li><a href="#" className="hover:text-red-500 transition-colors">Contact Us</a></li>
               <li><a href="#" className="hover:text-red-500 transition-colors">Shipping Policy</a></li>
               <li><a href="#" className="hover:text-red-500 transition-colors">Returns & Exchanges</a></li>
               <li><a href="#" className="hover:text-red-500 transition-colors">FAQs</a></li>
@@ -70,7 +70,7 @@ const Footer = () => {
               </li>
               <li className="flex items-center gap-3">
                 <Mail size={18} className="text-red-600 flex-shrink-0" />
-                <span>support@threadzs.com</span>
+                <span>Threadzsofficial@gmail.com</span>
               </li>
             </ul>
           </div>

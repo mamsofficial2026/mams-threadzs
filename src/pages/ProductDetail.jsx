@@ -186,7 +186,6 @@ const ProductDetail = () => {
     }
   };
 
-  // ================= FIXED: PROPER LINK FORMAT SHARE LOGIC =================
   const shareUrl = window.location.href;
   const shareTitle = `Hey! Check out this ${product.name} at THREADZS! 🔥`;
 
@@ -196,7 +195,7 @@ const ProductDetail = () => {
         await navigator.share({
           title: 'THREADZS Drop',
           text: shareTitle,
-          url: shareUrl, // The OS automatically formats this as a rich link
+          url: shareUrl, 
         });
       } catch (error) {
         console.log('Error sharing:', error);
@@ -207,7 +206,6 @@ const ProductDetail = () => {
   };
 
   const handleWhatsAppShare = () => {
-    // 🔥 \n\n separates the text from the link so WhatsApp creates a preview card!
     const whatsappText = `${shareTitle}\n\n${shareUrl}`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappText)}`, '_blank');
   };
@@ -225,6 +223,28 @@ const ProductDetail = () => {
     navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  // --- NEW: DESCRIPTION FORMATTER FUNCTION ---
+  const formatDescription = (text) => {
+    if (!text) return null;
+    
+    // Check if the text uses our asterisk '*' format
+    if (text.includes('*')) {
+      // Split by '*', remove empty strings, and clean up whitespace
+      const points = text.split('*').map(item => item.trim()).filter(item => item.length > 0);
+      
+      return (
+        <ul className="list-disc pl-5 space-y-2 mb-4">
+          {points.map((point, index) => (
+            <li key={index} className="text-gray-600">{point}</li>
+          ))}
+        </ul>
+      );
+    }
+    
+    // Fallback if no asterisks are used (just return normal text)
+    return <p className="mb-4 text-gray-600">{text}</p>;
   };
 
   return (
@@ -420,11 +440,15 @@ const ProductDetail = () => {
                 {activeAccordion === 'details' ? <ChevronUp size={18} /> : <Plus size={18} />}
               </button>
               {activeAccordion === 'details' && (
-                <div className="pb-5 text-gray-500 text-sm leading-relaxed font-medium">
-                  {product.description} <br/><br/>
-                  <strong className="text-black uppercase text-xs font-black tracking-wider">Category:</strong> {product.category}<br/>
-                  <strong className="text-black uppercase text-xs font-black tracking-wider">Stock Status:</strong> {product.stock > 0 ? `${product.stock} Units Available` : 'Out of Stock'}<br/>
-                  Designed exclusively by THREADZS.
+                <div className="pb-5 text-sm leading-relaxed font-medium">
+                  {/* --- NEW: BULLET POINT FORMATTER APPLIED HERE --- */}
+                  {formatDescription(product.description)}
+                  
+                  <div className="mt-4 pt-4 border-t border-gray-100 text-gray-500">
+                    <strong className="text-black uppercase text-xs font-black tracking-wider">Category:</strong> {product.category}<br/>
+                    <strong className="text-black uppercase text-xs font-black tracking-wider">Stock Status:</strong> {product.stock > 0 ? `${product.stock} Units Available` : 'Out of Stock'}<br/>
+                    Designed exclusively by THREADZS.
+                  </div>
                 </div>
               )}
             </div>

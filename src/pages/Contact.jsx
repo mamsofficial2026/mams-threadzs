@@ -11,18 +11,15 @@ const Contact = () => {
     const message = e.target.customerMessage.value;
 
     // 2. Format the message for WhatsApp (using * for bold text)
-    const whatsappMessage = `Hello Mams Official!\n\n*New Customer Inquiry:*\n*Name:* ${name}\n*Phone:* ${phone}\n*Email:* ${email}\n*Message:* ${message}`;
+    const whatsappMessage = `Hello THREADZS Team! 👋\n\n*New Customer Inquiry:*\n*Name:* ${name}\n*Phone:* ${phone}\n*Email:* ${email}\n*Message:* ${message}`;
     
-    // 3. Create the WhatsApp API link with your number
-    const whatsappUrl = `https://wa.me/919043241335?text=${encodeURIComponent(whatsappMessage)}`;
+    // 3. Create the highly reliable WhatsApp API link
+    const whatsappUrl = `https://api.whatsapp.com/send?phone=919043241335&text=${encodeURIComponent(whatsappMessage)}`;
     
-    // 4. Open WhatsApp in a new tab
-    window.open(whatsappUrl, '_blank');
-
-    // 5. Keep your original alert
-    alert("Thank you Maddy bro! Message sent successfully. Our team will contact you shortly.");
+    // 4. Directly trigger the app (prevents popup blockers)
+    window.location.href = whatsappUrl;
     
-    // Optional: clear the form after submitting
+    // 5. Clear the form after submitting
     e.target.reset();
   };
 
@@ -38,7 +35,7 @@ const Contact = () => {
           
           {/* WhatsApp Card */}
           <a 
-            href="https://wa.me/919043241335" 
+            href="https://api.whatsapp.com/send?phone=919043241335" 
             target="_blank" 
             rel="noreferrer"
             className="block p-8 bg-gray-50 border border-gray-100 rounded-[2rem] hover:border-green-200 hover:shadow-xl hover:shadow-green-50/50 transition-all duration-300 group"
@@ -57,7 +54,7 @@ const Contact = () => {
 
           {/* Email Card */}
           <a 
-            href="mailto:mamsofficial2026@gmail.com"
+            href="mailto:Threadzsofficial@gmail.com"
             className="block p-8 bg-gray-50 border border-gray-100 rounded-[2rem] hover:border-red-200 hover:shadow-xl hover:shadow-red-50/50 transition-all duration-300 group"
           >
             <div className="flex items-start gap-5">
@@ -66,7 +63,7 @@ const Contact = () => {
               </div>
               <div>
                 <h3 className="font-black text-xl text-gray-900 uppercase tracking-wider mb-1">Official Email</h3>
-                <p className="text-gray-600 font-bold text-base md:text-lg mb-3 break-all">mamsofficial2026@gmail.com</p>
+                <p className="text-gray-600 font-bold text-base md:text-lg mb-3 break-all">Threadzsofficial@gmail.com</p>
                 <span className="text-xs text-red-600 font-bold uppercase tracking-widest bg-red-50 px-3 py-1 rounded-full border border-red-100">Click to Send Mail</span>
               </div>
             </div>
@@ -98,25 +95,21 @@ const Contact = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Your Name</label>
-                {/* Added name="customerName" */}
                 <input name="customerName" type="text" required className="w-full border-2 border-gray-200 p-4 rounded-xl focus:outline-none focus:border-black transition-colors" placeholder="Enter your name" />
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Phone Number</label>
-                {/* Added name="customerPhone" */}
                 <input name="customerPhone" type="tel" required className="w-full border-2 border-gray-200 p-4 rounded-xl focus:outline-none focus:border-black transition-colors" placeholder="Enter phone number" />
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Email Address</label>
-              {/* Added name="customerEmail" */}
               <input name="customerEmail" type="email" required className="w-full border-2 border-gray-200 p-4 rounded-xl focus:outline-none focus:border-black transition-colors" placeholder="youremail@example.com" />
             </div>
 
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Message</label>
-              {/* Added name="customerMessage" */}
               <textarea name="customerMessage" required rows="4" className="w-full border-2 border-gray-200 p-4 rounded-xl focus:outline-none focus:border-black transition-colors" placeholder="Type your message or pre-order queries here..."></textarea>
             </div>
 
