@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, ShoppingBag, ShoppingCart, 
   Users, Settings, LogOut, Menu, X, TrendingUp, Package,
-  Plus, Edit, Trash2, Search, XCircle, Eye, Truck, User, MapPin, FileText, Printer, UploadCloud, MessageCircle, AlertTriangle, MonitorPlay, Loader2, ChevronRight 
+  Plus, Edit, Trash2, Search, XCircle, Eye, Truck, User, MapPin, FileText, Printer, UploadCloud, MessageCircle, AlertTriangle, MonitorPlay, Loader2, ChevronRight, Palette
 } from 'lucide-react';
 
 import { useProducts } from '../context/ProductContext';
@@ -16,7 +16,7 @@ const AdminDashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isUploading, setIsUploading] = useState(false);
-
+  
   const [orders, setOrders] = useState([]);
   const [isFetchingOrders, setIsFetchingOrders] = useState(true);
 
@@ -41,14 +41,13 @@ const AdminDashboard = () => {
   const [editingId, setEditingId] = useState(null);
   
   const [formData, setFormData] = useState({
-    name: '', category: 'Men', subCategory: 'T-Shirts', price: '', original_price: '', stock: '', images: [], description: '', sizes: []
+    name: '', category: 'Men', subCategory: 'T-Shirts', price: '', original_price: '', stock: '', images: [], description: '', sizes: [], colors: []
   });
 
   const availableSizesList = ["XS", "S", "M", "L", "XL", "XXL"];
-
+  
   // ================= 3. DB FIXED: IG FEED STATE & LOGIC =================
   const [igFeedData, setIgFeedData] = useState([]);
-  // ADDED BACK: image_url to state
   const [igFormData, setIgFormData] = useState({ image_url: '', post_link: '', likes: '', is_reel: false });
   const [isSubmittingIg, setIsSubmittingIg] = useState(false);
 
@@ -100,6 +99,68 @@ const AdminDashboard = () => {
     });
   };
 
+  // --- NEW: DYNAMIC COLOR CONFIGURATION HANDLERS ---
+  const addColorVariant = () => {
+    setFormData(prev => ({
+      ...prev,
+      colors: [...(prev.colors || []), { name: '', hex: '#000000', images: [] }]
+    }));
+  };
+
+  const removeColorVariant = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      colors: prev.colors.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleColorDetailsChange = (index, field, value) => {
+    setFormData(prev => {
+      const updatedColors = [...prev.colors];
+      updatedColors[index] = { ...updatedColors[index], [field]: value };
+      return { ...prev, colors: updatedColors };
+    });
+  };
+
+  const handleColorImageUpload = async (e, colorIndex) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    setIsUploading(true);
+    try {
+      const uploadPromises = files.map(async (file) => {
+        const data = new FormData();
+        data.append('file', file);
+        data.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+        data.append('cloud_name', CLOUDINARY_CLOUD_NAME);
+        const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: data });
+        const uploadedImage = await response.json();
+        return uploadedImage.secure_url;
+      });
+      const uploadedUrls = await Promise.all(uploadPromises);
+      
+      setFormData(prev => {
+        const updatedColors = [...prev.colors];
+        updatedColors[colorIndex].images = [...(updatedColors[colorIndex].images || []), ...uploadedUrls];
+        // Mirror all color images to the main images array for backward compatibility across store previews
+        const allFlattenedImages = updatedColors.flatMap(c => c.images || []);
+        return { ...prev, colors: updatedColors, images: allFlattenedImages };
+      });
+    } catch (error) {
+      alert("Cloudinary Color Image Upload Failed!");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const removeColorImage = (colorIndex, imgIndexToRemove) => {
+    setFormData(prev => {
+      const updatedColors = [...prev.colors];
+      updatedColors[colorIndex].images = updatedColors[colorIndex].images.filter((_, i) => i !== imgIndexToRemove);
+      const allFlattenedImages = updatedColors.flatMap(c => c.images || []);
+      return { ...prev, colors: updatedColors, images: allFlattenedImages };
+    });
+  };
+
   const handleMultipleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -129,14 +190,21 @@ const AdminDashboard = () => {
     setEditingId(null);
     const initialCat = Object.keys(categoryMap)[0] || '';
     const initialSubCat = categoryMap[initialCat]?.[0] || '';
-    setFormData({ name: '', category: initialCat, subCategory: initialSubCat, price: '', original_price: '', stock: '', images: [], description: '', sizes: [] });
+    setFormData({ name: '', category: initialCat, subCategory: initialSubCat, price: '', original_price: '', stock: '', images: [], description: '', sizes: [], colors: [] });
     setIsModalOpen(true);
   };
 
   const handleEdit = (product) => {
     setEditingId(product.id);
     const productImages = product.images ? product.images : (product.image ? [product.image] : []);
-    setFormData({ ...product, sizes: product.sizes || [], images: productImages, original_price: product.original_price || '', subCategory: product.sub_category || '' });
+    setFormData({ 
+      ...product, 
+      sizes: product.sizes || [], 
+      images: productImages, 
+      original_price: product.original_price || '', 
+      subCategory: product.sub_category || '',
+      colors: product.colors || [] // Hydrate array object from DB safely
+    });
     setIsModalOpen(true);
   };
 
@@ -154,14 +222,23 @@ const AdminDashboard = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!formData.images || formData.images.length === 0) return alert("Please upload at least one product image!");
+    if ((!formData.images || formData.images.length === 0) && (!formData.colors || formData.colors.length === 0)) {
+      return alert("Please upload at least one product image or set a color variant!");
+    }
 
     try {
       setIsUploading(true);
       const productData = {
-        name: formData.name, category: formData.category, sub_category: formData.subCategory, 
-        price: formData.price.toString(), original_price: formData.original_price ? formData.original_price.toString() : '', 
-        stock: parseInt(formData.stock), sizes: formData.sizes, description: formData.description, images: formData.images
+        name: formData.name, 
+        category: formData.category, 
+        sub_category: formData.subCategory, 
+        price: formData.price.toString(), 
+        original_price: formData.original_price ? formData.original_price.toString() : '', 
+        stock: parseInt(formData.stock), 
+        sizes: formData.sizes, 
+        description: formData.description, 
+        images: formData.images,
+        colors: formData.colors || [] // Structural persistence inside Supabase JSONB node
       };
 
       if (editingId) {
@@ -231,6 +308,7 @@ const AdminDashboard = () => {
       if (selectedOrder && selectedOrder.id === orderId) setSelectedOrder({ ...selectedOrder, status: newStatus });
     } catch (error) { alert("Failed to update order status."); }
   };
+  
   const handleDeleteOrder = async (orderId) => {
     if (window.confirm("Are you sure you want to permanently delete this order?")) {
       try {
@@ -240,10 +318,58 @@ const AdminDashboard = () => {
       } catch (error) { alert("Error deleting order from database."); }
     }
   };
+  
   const handlePrint = () => window.print();
+  
   const handleWhatsAppNotify = (order) => {
     const message = `Hi ${order.customer},%0A%0AThanks for choosing *THREADZS*! 👕%0AYour Order ${order.id} is currently: *${order.status}*.%0A%0AWe will keep you updated. Get ready for the drip! ✨`;
     window.open(`https://wa.me/91${order.phone}?text=${message}`, '_blank');
+  };
+
+  // --- PUSH TO QIKINK FUNCTION (PYTHON BACKEND PERSISTENCE) ---
+  const handlePushToQikink = async (order) => {
+    if (!window.confirm(`Push Order #${order.id} to Qikink for production?`)) return;
+
+    try {
+      const orderDataPayload = {
+        orderDetails: {
+          order_id: order.id.toString(), 
+          first_name: order.customer || "Customer",
+          phone: order.phone || "9999999999",
+          address1: order.address || "Test Address",
+          city: order.city || "Madurai",
+          zip: order.pincode || "625001",
+          country: "India",
+          items: (Array.isArray(order.items) ? order.items : []).map(item => ({
+            sku: "v-9Rmg3yKEaVZW0sELNBQoubTRrQva9neZ", 
+            quantity: item.quantity || 1,
+            price: item.price || 449
+          }))
+        }
+      };
+
+      const response = await fetch('http://localhost:8000/api/qikink-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(orderDataPayload)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail || result.error || "Backend error");
+      }
+      
+      alert("🔥 Order successfully pushed to Qikink via Python! Production started.");
+      updateOrderStatus(order.id, 'Processing');
+      setIsOrderModalOpen(false);
+
+    } catch (error) {
+      console.error("Qikink Push Error:", error);
+      alert(`Failed to push order to Qikink. Error: ${error.message}`);
+    }
   };
 
   const handleHeroImageUpload = async (e) => {
@@ -254,7 +380,9 @@ const AdminDashboard = () => {
       const uploadedImage = await response.json(); setHeroBanner({ ...heroBanner, image: uploadedImage.secure_url });
     } catch (error) { alert("Hero Image upload failed!"); } finally { setIsUploading(false); }
   };
+  
   const handleHeroBannerChange = (e) => setHeroBanner({ ...heroBanner, [e.target.name]: e.target.value });
+  
   const handleHeroSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -263,7 +391,7 @@ const AdminDashboard = () => {
       if (error) throw error; alert("Hero Section Updated Successfully in Database! 🔥");
     } catch (error) { console.error(error); alert("Error saving hero banner to database."); } finally { setIsUploading(false); }
   };
-// --- NEW: IG IMAGE AUTO UPLOAD HANDLER ---
+
   const handleIgImageUpload = async (e) => {
     const file = e.target.files[0]; 
     if (!file) return;
@@ -275,7 +403,6 @@ const AdminDashboard = () => {
     try {
       const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: data });
       const uploadedImage = await response.json(); 
-      // Link-a automatic aah state-la set pannidurom
       setIgFormData({ ...igFormData, image_url: uploadedImage.secure_url });
     } catch (error) { 
       alert("Image upload failed!"); 
@@ -283,7 +410,7 @@ const AdminDashboard = () => {
       setIsUploading(false); 
     }
   };
-  // --- DB FIXED: IG FEED HANDLERS ---
+
   const handleIgFormChange = (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setIgFormData({ ...igFormData, [e.target.name]: value });
@@ -294,7 +421,6 @@ const AdminDashboard = () => {
     try {
       setIsSubmittingIg(true);
       
-      // ADDED BACK image_url so DB won't throw Error 23502 (Not-null constraint)
       const payload = {
         image_url: igFormData.image_url,
         post_link: igFormData.post_link,
@@ -706,8 +832,68 @@ const AdminDashboard = () => {
             </div>
 
             <form onSubmit={handleSave} className="p-6 space-y-6">
+              
+              {/* --- ADVANCED COLOR VARIANT TRAYS MODULE --- */}
+              <div className="bg-gray-50 p-5 rounded-2xl border border-gray-200 space-y-4">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-3">
+                  <h3 className="text-sm font-black uppercase tracking-wider text-gray-800 flex items-center gap-2">
+                    <Palette size={18} className="text-red-600" /> Color Variants & Mockup Trays
+                  </h3>
+                  <button type="button" onClick={addColorVariant} className="bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-gray-800 flex items-center gap-1">
+                    <Plus size={14} /> Add Color
+                  </button>
+                </div>
+
+                {(!formData.colors || formData.colors.length === 0) ? (
+                  <p className="text-xs text-gray-400 font-bold italic text-center py-2">No color variants added yet. Add variants to upload color-swapping images!</p>
+                ) : (
+                  formData.colors.map((color, colorIdx) => (
+                    <div key={colorIdx} className="bg-white p-4 rounded-xl border border-gray-200 space-y-3 relative group">
+                      <button type="button" onClick={() => removeColorVariant(colorIdx)} className="absolute top-3 right-3 text-gray-400 hover:text-red-600 transition-colors" title="Delete Color Variant">
+                        <Trash2 size={16} />
+                      </button>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-black tracking-wider text-gray-400 uppercase mb-1">Color Display Name</label>
+                          <input type="text" required value={color.name || ''} onChange={(e) => handleColorDetailsChange(colorIdx, 'name', e.target.value)} placeholder="E.g. Vintage Black, Crisp White" className="w-full border border-gray-200 p-2.5 rounded-lg font-bold text-xs focus:outline-none focus:border-black text-gray-900" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black tracking-wider text-gray-400 uppercase mb-1">Hex Code (Circle Color)</label>
+                          <div className="flex gap-2 items-center">
+                            <input type="color" value={color.hex || '#000000'} onChange={(e) => handleColorDetailsChange(colorIdx, 'hex', e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200 bg-transparent" />
+                            <input type="text" value={color.hex || '#000000'} onChange={(e) => handleColorDetailsChange(colorIdx, 'hex', e.target.value)} placeholder="#000000" className="flex-1 border border-gray-200 p-2 rounded-lg font-mono text-xs focus:outline-none focus:border-black text-gray-900" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tray Specific Custom Photos */}
+                      <div>
+                        <label className="block text-[10px] font-black tracking-wider text-gray-400 uppercase mb-1.5">Images for {color.name || `Color #${colorIdx + 1}`}</label>
+                        <div className="flex gap-3 overflow-x-auto pb-1 items-center">
+                          {color.images && color.images.map((imgSrc, imgIdx) => (
+                            <div key={imgIdx} className="w-16 h-20 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0 relative group/img border border-gray-200 shadow-sm">
+                              <img src={imgSrc} alt="Variant element" className="w-full h-full object-cover" />
+                              <button type="button" onClick={() => removeColorImage(colorIdx, imgIdx)} className="absolute top-0.5 right-0.5 bg-red-600 text-white p-0.5 rounded-full shadow opacity-100 sm:opacity-0 sm:group-hover/img:opacity-100 transition-opacity"><X size={10} /></button>
+                            </div>
+                          ))}
+                          <div className="w-16 h-20 flex-shrink-0">
+                            <label className={`flex flex-col items-center justify-center w-full h-full border border-dashed border-gray-300 rounded-lg transition-colors ${isUploading ? 'bg-gray-100 cursor-not-allowed' : 'bg-gray-50 hover:bg-gray-100 cursor-pointer'}`}>
+                              {isUploading ? <Loader2 className="w-4 h-4 text-red-600 animate-spin mb-0.5" /> : <UploadCloud className="w-4 h-4 mb-0.5 text-gray-400" />}
+                              <span className="text-[8px] font-black text-gray-500 text-center px-1 uppercase tracking-wider">{isUploading ? "..." : "Add"}</span>
+                              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleColorImageUpload(e, colorIdx)} disabled={isUploading} />
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* --- STANDARD FLAT IMAGE POOL SECTION (BACKWARD COMPATIBILITY TRAY) --- */}
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Product Images</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">General Backup Photos (Flat List)</label>
                 <div className="flex gap-4 overflow-x-auto pb-2 items-center">
                   {formData.images && formData.images.map((imgSrc, index) => (
                     <div key={index} className="w-24 h-32 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 relative group border-2 border-gray-200">
@@ -864,7 +1050,7 @@ const AdminDashboard = () => {
                 </div>
                 <div className="border-t md:border-t-0 md:border-l border-gray-200 pt-4 md:pt-0 md:pl-6 print:border-black print:border-l print:pt-0 print:pl-6">
                   <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-1 print:text-black"><MapPin size={14} /> Dispatch Origin (From)</h3>
-                  <p className="text-sm font-bold text-black leading-relaxed"><span className="font-black text-lg">THREADZS Hub</span><br/>South Veli Street, Madurai - 625001<br/>Tamil Nadu, India.</p>
+                  <p className="text-sm font-bold text-black leading-relaxed"><span className="font-black text-lg">THREADZS </span><br/>South Veli Street, Madurai - 625001<br/>Tamil Nadu, India.</p>
                 </div>
               </div>
 
@@ -925,11 +1111,17 @@ const AdminDashboard = () => {
 
               <div className="pt-6 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4 print:hidden">
                 <div className="flex items-center gap-2"><span className="text-sm font-bold text-gray-500">Status:</span><span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${selectedOrder.status === 'Delivered' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{selectedOrder.status || 'Processing'}</span></div>
+                
                 <div className="flex flex-wrap gap-2 w-full md:w-auto justify-end">
+                  <button onClick={() => handlePushToQikink(selectedOrder)} className="bg-orange-500 text-white px-5 py-3 text-xs font-black rounded-xl uppercase flex items-center gap-2 shadow-md hover:bg-orange-600 transition-colors">
+                    <Package size={16} /> Push to Qikink
+                  </button>
+                  
                   <button onClick={() => handleWhatsAppNotify(selectedOrder)} className="bg-[#25D366] text-white px-5 py-3 text-xs font-black rounded-xl uppercase flex items-center gap-2"><MessageCircle size={16} /> WhatsApp</button>
                   <button onClick={handlePrint} className="bg-gray-900 text-white px-5 py-3 text-xs font-black rounded-xl uppercase flex items-center gap-2"><Printer size={16} /> Print</button>
                   <button onClick={() => setIsOrderModalOpen(false)} className="bg-white border-2 border-gray-200 text-gray-600 px-5 py-3 text-xs font-bold rounded-xl uppercase">Close</button>
                 </div>
+                
               </div>
             </div>
           </div>

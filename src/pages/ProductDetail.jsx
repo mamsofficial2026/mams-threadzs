@@ -4,41 +4,37 @@ import {
   Check, Plus, Minus, Copy, MessageCircle, Star, ChevronDown, ChevronUp 
 } from 'lucide-react'; 
 import { useCart } from '../context/CartContext';
-
-// --- NEW: Import our Central Godown (Global State) & Supabase ---
 import { useProducts } from '../context/ProductContext';
-import { supabase } from '../supabaseClient'; // Imported Supabase Client
+import { supabase } from '../supabaseClient'; 
 
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
   
-  // --- NEW: Fetching products from Global Context ---
   const { products } = useProducts();
 
   const [selectedSize, setSelectedSize] = useState('M');
+  // --- NEW: STATE FOR COLOR VARIANT ---
+  const [selectedColor, setSelectedColor] = useState(null);
+  
   const [quantity, setQuantity] = useState(1);
   const [isAdded, setIsAdded] = useState(false);
   const [activeAccordion, setActiveAccordion] = useState('details');
 
-  // --- AMAZON STYLE IMAGE GALLERY STATE ---
   const [mainImage, setMainImage] = useState('');
   const [fade, setFade] = useState(false); 
 
-  // --- REVIEW SYSTEM STATES ---
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [rating, setRating] = useState(5);
   const [reviewerName, setReviewerName] = useState('');
   const [reviewText, setReviewText] = useState('');
   const [reviews, setReviews] = useState([]);
 
-  // --- NEW FIX 1: Auto Scroll to Top on Page Load ---
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [id]);
 
-  // --- NEW: Fetch Reviews from Supabase Database on load ---
   useEffect(() => {
     const fetchReviews = async () => {
       if (!id) return;
@@ -51,7 +47,6 @@ const ProductDetail = () => {
 
         if (error) throw error;
         
-        // Format the created_at timestamp to clean DD/MM/YYYY string format
         const formattedReviews = (data || []).map(r => ({
           ...r,
           date: new Date(r.created_at).toLocaleDateString('en-GB')
@@ -65,35 +60,51 @@ const ProductDetail = () => {
     fetchReviews();
   }, [id]);
 
-  // --- NEW: Find the exact product from our Global State ---
   const product = products.find(p => p.id === parseInt(id));
 
-  // --- NEW: Dynamic Gallery Logic ---
-  const galleryImages = product 
-    ? (product.images && product.images.length > 0 
-        ? product.images 
-        : [
-            product.image, 
-            "https://images.unsplash.com/photo-1503342394128-c104d54dba01?w=800&q=80", 
-            "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&q=80", 
-            "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800&q=80"  
-          ].filter(Boolean))
-    : [];
-
-  // --- NEW: Dynamic Sizes Logic ---
-  const availableSizes = product && product.sizes && product.sizes.length > 0 
-    ? product.sizes 
-    : ['XS', 'S', 'M', 'L', 'XL', '2XL'];
-
+  // --- UPDATED: DYNAMIC INITIALIZATION FOR COLORS ---
   useEffect(() => {
     if (product) {
-      const initialImage = (product.images && product.images.length > 0) ? product.images[0] : product.image;
-      setMainImage(initialImage);
+      if (product.colors && product.colors.length > 0) {
+        // Setup initial color if variants exist
+        const initialColor = product.colors[0];
+        setSelectedColor(initialColor);
+        const initialImg = (initialColor.images && initialColor.images.length > 0) 
+            ? initialColor.images[0] 
+            : (product.image || product.images?.[0]);
+        setMainImage(initialImg);
+      } else {
+        // Fallback for older products without color variants
+        const initialImg = (product.images && product.images.length > 0) ? product.images[0] : product.image;
+        setMainImage(initialImg);
+      }
+
       if (product.sizes && product.sizes.length > 0) {
         setSelectedSize(product.sizes[0]);
       }
     }
   }, [product]);
+
+  // --- UPDATED: DYNAMIC GALLERY FILTERING BASED ON COLOR ---
+  let galleryImages = [];
+  if (product) {
+    if (selectedColor && selectedColor.images && selectedColor.images.length > 0) {
+      galleryImages = selectedColor.images; // Show ONLY selected color images
+    } else if (product.images && product.images.length > 0) {
+      galleryImages = product.images; // Fallback to all images
+    } else {
+      galleryImages = [
+        product.image, 
+        "https://images.unsplash.com/photo-1503342394128-c104d54dba01?w=800&q=80", 
+        "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&q=80", 
+        "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800&q=80"  
+      ].filter(Boolean);
+    }
+  }
+
+  const availableSizes = product && product.sizes && product.sizes.length > 0 
+    ? product.sizes 
+    : ['XS', 'S', 'M', 'L', 'XL', '2XL'];
 
   const changeImage = (img) => {
     if (mainImage === img) return;
@@ -101,6 +112,21 @@ const ProductDetail = () => {
     setTimeout(() => {
       setMainImage(img);
       setFade(false); 
+    }, 200);
+  };
+
+  // --- NEW: COLOR CHANGE HANDLER ---
+  const handleColorSwitch = (colorVariant) => {
+    if (selectedColor?.name === colorVariant.name) return;
+    setFade(true);
+    setTimeout(() => {
+      setSelectedColor(colorVariant);
+      // Auto-switch main image to the first image of the new color variant
+      const newMain = (colorVariant.images && colorVariant.images.length > 0) 
+          ? colorVariant.images[0] 
+          : mainImage;
+      setMainImage(newMain);
+      setFade(false);
     }, 200);
   };
 
@@ -112,15 +138,17 @@ const ProductDetail = () => {
   };
 
   const handleAddToCart = () => {
+    // Optionally attaching the selected color name to the product before cart 
+    const productToAdd = { ...product, selected_color: selectedColor?.name };
     for(let i=0; i<quantity; i++) {
-      addToCart(product, selectedSize);
+      addToCart(productToAdd, selectedSize);
     }
     setIsAdded(true);
     setTimeout(() => setIsAdded(false), 2000);
   };
 
   const handleBuyNow = () => {
-    const buyNowItem = { ...product, size: selectedSize, quantity: quantity, cartId: 'buynow-' + Date.now() };
+    const buyNowItem = { ...product, size: selectedSize, color: selectedColor?.name, quantity: quantity, cartId: 'buynow-' + Date.now() };
     navigate('/checkout', { state: { directItem: buyNowItem } });
   };
 
@@ -209,7 +237,6 @@ const ProductDetail = () => {
         {/* ================= RIGHT: PRODUCT DETAILS ================= */}
         <div className="flex-1 h-fit">
           
-          {/* --- UPDATED: Funky Streetwear style interactive breadcrumbs link back to Home --- */}
           <nav className="text-xs font-black uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-1.5">
             <Link to="/" className="hover:text-red-600 transition-colors border-b-2 border-transparent hover:border-red-600 pb-0.5">Home</Link> 
             <span className="text-gray-300">/</span> 
@@ -218,10 +245,8 @@ const ProductDetail = () => {
             <span className="text-black truncate max-w-[200px]">{product.name}</span>
           </nav>
 
-          {/* --- UPDATED: Heading font set to maximum funky/bold typography layout --- */}
           <h1 className="text-2xl md:text-4xl font-black mb-4 tracking-tighter uppercase leading-tight text-gray-900">{product.name}</h1>
           
-          {/* --- UPDATED: Highlighting Price Block section with a premium outline frame card --- */}
           <div className="inline-flex items-center gap-4 mb-8 bg-gray-50 border border-gray-100 px-5 py-3 rounded-2xl shadow-sm">
             <div className="flex flex-col">
               <span className="text-[9px] font-black text-red-600 uppercase tracking-widest mb-0.5">Drop Price</span>
@@ -242,15 +267,40 @@ const ProductDetail = () => {
             )}
           </div>
 
-          {/* Color Area */}
+          {/* --- UPDATED: DYNAMIC COLOR CIRCLES --- */}
           <div className="mb-8">
-            <h3 className="font-black text-xs uppercase tracking-widest text-gray-500 mb-3">Color:</h3>
-            <div className="flex flex-col items-start">
-              <div className="w-14 h-14 rounded-full border-2 border-black p-1 cursor-pointer overflow-hidden shadow-sm">
-                <img src={mainImage} className="w-full h-full object-cover rounded-full" alt="Color preview" />
+            <h3 className="font-black text-xs uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-2">
+              Color: <span className="text-black">{selectedColor ? selectedColor.name : 'Standard Base'}</span>
+            </h3>
+            
+            {product.colors && product.colors.length > 0 ? (
+              <div className="flex flex-wrap gap-3">
+                {product.colors.map((color, idx) => {
+                  const isActive = selectedColor?.name === color.name;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => handleColorSwitch(color)}
+                      className={`w-10 h-10 rounded-full transition-all duration-300 relative flex items-center justify-center
+                        ${isActive ? 'ring-2 ring-offset-2 ring-black scale-110' : 'ring-1 ring-gray-200 hover:ring-gray-400 opacity-80'}
+                      `}
+                      style={{ backgroundColor: color.hex || '#000000' }}
+                      title={color.name}
+                    >
+                       {/* Inner shadow to make light colors pop */}
+                       <div className="absolute inset-0 rounded-full shadow-inner pointer-events-none"></div>
+                    </button>
+                  );
+                })}
               </div>
-              <span className="text-xs mt-2 text-gray-900 font-black uppercase tracking-wider">Standard Base</span>
-            </div>
+            ) : (
+              // Fallback if no colors added yet
+              <div className="flex flex-col items-start">
+                <div className="w-10 h-10 rounded-full border border-gray-200 cursor-pointer overflow-hidden shadow-sm ring-2 ring-offset-2 ring-black">
+                  <img src={mainImage} className="w-full h-full object-cover" alt="Color preview" />
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Sizes Area */}
