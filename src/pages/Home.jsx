@@ -9,9 +9,9 @@ const Home = () => {
   const navigate = useNavigate();
 
   // DYNAMIC CATEGORY FILTERING
-  const menCollections = products.filter(p => p.category === 'Men');
-  const womenCollections = products.filter(p => p.category === 'Women');
-  const genZCollections = products.filter(p => p.category === 'Gen Z');
+  const menCollections = products.filter(p => p.category?.toLowerCase() === 'men');
+  const womenCollections = products.filter(p => p.category?.toLowerCase() === 'women');
+  const genZCollections = products.filter(p => p.category?.toLowerCase() === 'gen z' || p.category?.toLowerCase() === 'gen-z');
 
   // STRICT SUB-CATEGORY EXTRACTION
   const getSubCategories = (categoryProducts) => {
@@ -19,11 +19,27 @@ const Home = () => {
       .map(p => p.sub_category)
       .filter(sub => sub && sub.toUpperCase() !== 'NULL' && sub.toUpperCase() !== 'EMPTY' && sub.trim() !== '');
     const uniqueSubs = [...new Set(validSubs)];
+    
     return uniqueSubs.map(sub => {
       const firstProduct = categoryProducts.find(p => p.sub_category === sub);
+      
+      let rawImg = null;
+      if (firstProduct) {
+        if (firstProduct.colors && firstProduct.colors.length > 0 && firstProduct.colors[0].images && firstProduct.colors[0].images.length > 0) {
+          rawImg = firstProduct.colors[0].images[0];
+        } else if (firstProduct.images && firstProduct.images.length > 0) {
+          rawImg = firstProduct.images[0];
+        } else if (firstProduct.image) {
+          rawImg = firstProduct.image;
+        }
+      }
+
+      const isValidWebUrl = typeof rawImg === 'string' && (rawImg.startsWith('http://') || rawImg.startsWith('https://'));
+      const safeDisplayImage = isValidWebUrl ? rawImg : 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=500&q=80';
+
       return {
         name: sub,
-        image: (firstProduct?.images?.[0] || firstProduct?.image) || 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=500&q=80'
+        image: safeDisplayImage
       };
     });
   };
@@ -46,7 +62,6 @@ const Home = () => {
   const [customIgFeed, setCustomIgFeed] = useState([]);
 
   useEffect(() => {
-    // 1. Fetch Reviews
     const fetchReviews = async () => {
       try {
         const { data, error } = await supabase
@@ -60,14 +75,13 @@ const Home = () => {
       }
     };
 
-    // 2. Fetch Custom IG Feed from Supabase
     const fetchIgFeed = async () => {
       try {
         const { data, error } = await supabase
           .from('ig_feed')
           .select('*')
           .order('created_at', { ascending: false })
-          .limit(5); // Show latest 5 posts
+          .limit(5); 
         if (data) setCustomIgFeed(data);
       } catch (error) {
         console.error("Error fetching IG Feed:", error);
@@ -86,7 +100,18 @@ const Home = () => {
   };
 
   const renderPremiumCard = (item) => {
-    const displayImage = (item.images && item.images.length > 0) ? item.images[0] : (item.image || 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=500&q=80');
+    let rawImg = null;
+    if (item.colors && item.colors.length > 0 && item.colors[0].images && item.colors[0].images.length > 0) {
+      rawImg = item.colors[0].images[0];
+    } else if (item.images && item.images.length > 0) {
+      rawImg = item.images[0];
+    } else if (item.image) {
+      rawImg = item.image;
+    }
+
+    const isValidWebUrl = typeof rawImg === 'string' && (rawImg.startsWith('http://') || rawImg.startsWith('https://'));
+    const displayImage = isValidWebUrl ? rawImg : 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=500&q=80';
+
     const hasDiscount = item.original_price && !isNaN(item.original_price - item.price);
     const discountPercentage = hasDiscount ? Math.round(((item.original_price - item.price) / item.original_price) * 100) : 0;
 
@@ -109,6 +134,10 @@ const Home = () => {
       </Link>
     );
   };
+
+  // 🔥 FIXED: HERO BANNER SAFE URL EXTRACTION (BULLETPROOF FALLBACK)
+  const isHeroWebUrl = typeof heroBanner?.image === 'string' && (heroBanner.image.startsWith('http://') || heroBanner.image.startsWith('https://'));
+  const safeHeroBannerImg = isHeroWebUrl ? heroBanner.image : "https://images.unsplash.com/photo-1503342394128-c104d54dba01?w=800&q=80";
 
   return (
     <div className="w-full pb-20 relative overflow-hidden bg-white">
@@ -136,7 +165,9 @@ const Home = () => {
               </div>
               <div className="flex-1 relative w-full flex justify-center md:justify-end z-10">
                 <div className="relative w-full max-w-sm aspect-[3/4] rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white/20 transform md:rotate-3 hover:rotate-0 hover:scale-105 transition-all duration-500">
-                  <img src={heroBanner.image || null} alt="Hero Drop" className="w-full h-full object-cover"/>
+                  {/* 🔥 APPLIED SICK FALLBACK IMAGE HERE */}
+                  <img src={safeHeroBannerImg} alt="Hero Drop" className="w-full h-full object-cover"/>
+                  
                   <div className="absolute bottom-6 right-6 bg-black/80 backdrop-blur-md px-5 py-3 rounded-2xl font-bold flex flex-col items-center">
                     <span className="text-white text-xl">100%</span>
                     <span className="text-[10px] uppercase tracking-widest text-red-400 mt-1">Premium</span>
