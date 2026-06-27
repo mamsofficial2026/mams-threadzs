@@ -1,12 +1,17 @@
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Trash2, ShoppingBag, ArrowRight, Tag } from 'lucide-react'; // 🔥 Added Tag icon for discount
 
 const Cart = () => {
   const { cartItems, removeFromCart } = useCart();
 
   // Basic total calculation
+  const totalItems = cartItems ? cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0) : 0;
   const subtotal = cartItems ? cartItems.reduce((acc, item) => acc + (parseInt(item.price) * (item.quantity || 1)), 0) : 0;
+
+  // 🔥 NEW: Bundle Discount Logic (Buy 2+ Tees, Get ₹100 Off)
+  const discountAmount = totalItems >= 2 ? 100 : 0;
+  const finalTotal = subtotal - discountAmount;
 
   if (!cartItems || cartItems.length === 0) {
     return (
@@ -30,6 +35,25 @@ const Cart = () => {
       <div className="flex flex-col lg:flex-row gap-10">
         {/* Cart Items List */}
         <div className="flex-[2]">
+          
+          {/* 🔥 NEW: Upsell Progress Bar */}
+          <div className="bg-red-50 border border-red-100 rounded-2xl p-4 mb-6 flex flex-col items-center text-center">
+            {totalItems < 2 ? (
+              <>
+                <p className="text-sm font-bold text-red-800 mb-2">
+                  Add <span className="font-black text-red-600">1 more item</span> to unlock ₹100 Flat Discount! 🎁
+                </p>
+                <div className="w-full max-w-sm bg-red-200 rounded-full h-2.5 mb-1 overflow-hidden">
+                  <div className="bg-red-600 h-2.5 rounded-full" style={{ width: '50%' }}></div>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm font-bold text-green-700">
+                🎉 Awesome! You've unlocked the ₹100 Bundle Discount!
+              </p>
+            )}
+          </div>
+
           <div className="bg-white border border-gray-100 rounded-3xl shadow-sm p-6">
             {cartItems.map((item, index) => {
               const displayImage = (item.images && item.images.length > 0) ? item.images[0] : item.image;
@@ -67,10 +91,19 @@ const Cart = () => {
             
             <div className="space-y-4 mb-6">
               <div className="flex justify-between text-gray-600 font-medium">
-                <span>Subtotal ({cartItems.length} items)</span>
+                <span>Subtotal ({totalItems} items)</span>
                 <span className="font-bold text-gray-900">₹{subtotal}</span>
               </div>
-              <div className="flex justify-between text-gray-600 font-medium">
+              
+              {/* 🔥 NEW: Discount Row display */}
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-green-600 font-bold animate-in slide-in-from-right-2">
+                  <span className="flex items-center gap-1.5"><Tag size={16}/> Bundle Discount</span>
+                  <span>-₹{discountAmount}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between text-gray-600 font-medium border-t border-gray-200 pt-4 mt-4">
                 <span>Shipping</span>
                 <span className="font-bold text-green-600 uppercase tracking-wider text-xs">Free</span>
               </div>
@@ -78,7 +111,7 @@ const Cart = () => {
             
             <div className="flex justify-between items-center border-t border-gray-200 pt-6 mb-8">
               <span className="text-lg font-bold text-gray-900 uppercase tracking-wider">Total</span>
-              <span className="text-3xl font-black text-red-600">₹{subtotal}</span>
+              <span className="text-3xl font-black text-red-600">₹{finalTotal}</span>
             </div>
 
             <Link 

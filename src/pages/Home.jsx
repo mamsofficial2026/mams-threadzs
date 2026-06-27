@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useProducts } from '../context/ProductContext';
 import { useRef, useState, useEffect } from 'react'; 
 import { supabase } from '../supabaseClient'; 
+import { Helmet } from 'react-helmet-async'; 
 
 const Home = () => {
   const { products, heroBanner } = useProducts();
@@ -12,6 +13,9 @@ const Home = () => {
   const menCollections = products.filter(p => p.category?.toLowerCase() === 'men');
   const womenCollections = products.filter(p => p.category?.toLowerCase() === 'women');
   const genZCollections = products.filter(p => p.category?.toLowerCase() === 'gen z' || p.category?.toLowerCase() === 'gen-z');
+
+  // 🔥 NEW: Extract Top 4 Products for the Best Sellers Section
+  const bestSellers = products && products.length > 0 ? products.slice(0, 4) : [];
 
   // STRICT SUB-CATEGORY EXTRACTION
   const getSubCategories = (categoryProducts) => {
@@ -56,6 +60,7 @@ const Home = () => {
   const menSubRef = useRef(null);
   const womenSubRef = useRef(null);
   const genZSubRef = useRef(null);
+  const bestSellersRef = useRef(null); // 🔥 NEW: Best Sellers Ref
 
   // STATE FOR REVIEWS & CUSTOM IG FEED
   const [realReviews, setRealReviews] = useState([]);
@@ -126,7 +131,17 @@ const Home = () => {
         </div>
         <div className="pt-4 pb-2 px-1 text-left flex flex-col relative z-20">
           <h3 className="text-sm text-gray-900 font-black tracking-tight uppercase truncate w-full group-hover:text-red-600 transition-colors duration-200">{item.name}</h3>
-          <div className="flex items-baseline gap-2 mt-1">
+          
+          <div className="flex items-center gap-1 mt-1 mb-1.5">
+            <div className="flex items-center gap-1 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 text-[10px] font-bold text-gray-600">
+              <span>4.8</span>
+              <Star size={10} className="fill-yellow-400 text-yellow-400" />
+              <span className="text-gray-300 mx-0.5">|</span>
+              <span>12+</span>
+            </div>
+          </div>
+
+          <div className="flex items-baseline gap-2 mt-0.5">
             <span className="text-base font-black text-black">₹{item.price}</span>
             {item.original_price && <span className="text-xs text-gray-400 line-through font-bold">₹{item.original_price}</span>}
           </div>
@@ -135,13 +150,61 @@ const Home = () => {
     );
   };
 
-  // 🔥 FIXED: HERO BANNER SAFE URL EXTRACTION (BULLETPROOF FALLBACK)
   const isHeroWebUrl = typeof heroBanner?.image === 'string' && (heroBanner.image.startsWith('http://') || heroBanner.image.startsWith('https://'));
   const safeHeroBannerImg = isHeroWebUrl ? heroBanner.image : "https://images.unsplash.com/photo-1503342394128-c104d54dba01?w=800&q=80";
 
   return (
     <div className="w-full pb-20 relative overflow-hidden bg-white">
       
+      <Helmet>
+        {/* Core SEO */}
+        <title>THREADZS | Premium Fashion. Timeless Style.</title>
+        <meta name="description" content="Discover THREADZS: Premium oversized t-shirts, exclusive crop tops, and streetwear designed for the modern lifestyle. Wear Beyond Ordinary." />
+        <meta name="keywords" content="THREADZS, oversized t-shirts, crop tops, streetwear india, premium fashion, Gen Z clothing" />
+        <link rel="canonical" href="https://www.threadzs.com" />
+
+        {/* Open Graph (Social Sharing for WhatsApp, FB, IG) */}
+        <meta property="og:title" content="THREADZS - Wear Beyond Ordinary" />
+        <meta property="og:description" content="Shop premium oversized t-shirts, crop tops, and exclusive streetwear. Redefine your drip." />
+        <meta property="og:image" content={safeHeroBannerImg} />
+        <meta property="og:url" content="https://www.threadzs.com" />
+        <meta property="og:type" content="website" />
+
+        {/* Twitter Cards */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="THREADZS | Premium Fashion" />
+        <meta name="twitter:description" content="Redefine your drip with our premium collections." />
+        <meta name="twitter:image" content={safeHeroBannerImg} />
+
+        {/* JSON-LD Schema Markup (For Google AI, ChatGPT, Perplexity - GEO/AEO) */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "ClothingStore",
+            "name": "THREADZS",
+            "description": "Premium Fashion. Timeless Style. Shop the best oversized t-shirts, crop tops, and streetwear collections.",
+            "url": "https://www.threadzs.com",
+            "image": safeHeroBannerImg,
+            "telephone": "+919043241335",
+            "email": "mamsofficial2026@gmail.com",
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "South Veli Street",
+              "addressLocality": "Madurai",
+              "addressRegion": "Tamil Nadu",
+              "postalCode": "625001",
+              "addressCountry": "IN"
+            },
+            "sameAs": [
+              "https://www.instagram.com/threadzs_official/"
+            ],
+            "priceRange": "₹₹",
+            "paymentAccepted": "Online Payment (UPI, Cards)",
+            "openingHours": "Mo-Sa 10:00-20:00"
+          })}
+        </script>
+      </Helmet>
+
       {/* ================= HERO SECTION ================= */}
       {heroBanner && (
         <div className="w-full px-4 sm:px-6 lg:px-8 pt-8 pb-10">
@@ -149,14 +212,17 @@ const Home = () => {
             <div className="absolute -top-[50%] -left-[10%] w-[70%] h-[150%] bg-gradient-to-r from-white/10 to-transparent -rotate-12 transform origin-top-left pointer-events-none"></div>
             <div className="relative flex flex-col-reverse md:flex-row items-center justify-between py-12 md:py-20 px-6 md:px-16 gap-12">
               <div className="flex-1 text-center md:text-left z-10">
+                {/* 🔥 UPDATED: Made in Madurai Tagline */}
                 <span className="inline-block py-1.5 px-4 rounded-full bg-white/20 text-white text-xs md:text-sm font-bold tracking-[0.2em] uppercase mb-6 backdrop-blur-md border border-white/20">
-                  {heroBanner.tagline || "🔥 New Drop • Limited Edition"}
+                  {heroBanner.tagline || "📍 DESIGNED & MADE IN MADURAI"}
                 </span>
+                {/* 🔥 UPDATED: Emotional Premium Heading */}
                 <h1 className="text-5xl md:text-6xl lg:text-7xl font-black mb-6 leading-[1.1] tracking-tighter text-white drop-shadow-xl whitespace-pre-line">
-                  {heroBanner.heading || "REDEFINE \n YOUR DRIP."}
+                  {heroBanner.heading || "WEAR LESS.\nSAY MORE."}
                 </h1>
+                {/* 🔥 UPDATED: Premium Subtext */}
                 <p className="max-w-md mx-auto md:mx-0 text-white/90 text-base md:text-lg mb-10 font-medium leading-relaxed">
-                  {heroBanner.subtext || "Premium oversized & plain t-shirts crafted for the modern lifestyle. Stand out from the crowd with our exclusive THREADZS collection."}
+                  {heroBanner.subtext || "Premium 240 GSM French Terry cotton. Fair price. No logo tax. Just the best basic you'll ever own."}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
                   <Link to="/collections/men" className="bg-black text-white px-8 py-4 font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all duration-300 rounded-full flex items-center justify-center">Shop Men</Link>
@@ -165,7 +231,6 @@ const Home = () => {
               </div>
               <div className="flex-1 relative w-full flex justify-center md:justify-end z-10">
                 <div className="relative w-full max-w-sm aspect-[3/4] rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white/20 transform md:rotate-3 hover:rotate-0 hover:scale-105 transition-all duration-500">
-                  {/* 🔥 APPLIED SICK FALLBACK IMAGE HERE */}
                   <img src={safeHeroBannerImg} alt="Hero Drop" className="w-full h-full object-cover"/>
                   
                   <div className="absolute bottom-6 right-6 bg-black/80 backdrop-blur-md px-5 py-3 rounded-2xl font-bold flex flex-col items-center">
@@ -174,6 +239,25 @@ const Home = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= 🔥 NEW: BEST SELLERS SECTION ================= */}
+      {bestSellers.length > 0 && (
+        <div className="bg-white border-t border-gray-100">
+          <div className="max-w-[1400px] mx-auto px-4 pt-10 pb-12">
+            <div className="text-center pb-8">
+              <h2 className="text-3xl md:text-4xl font-black text-gray-900 tracking-wider uppercase">Best Sellers</h2>
+              <div className="w-16 h-1 bg-red-600 mx-auto mt-4 rounded-full shadow-[0_0_10px_rgba(220,38,38,0.8)]"></div>
+            </div>
+            <div className="relative group">
+              <button onClick={() => scroll(bestSellersRef, 'left')} className="absolute left-0 top-1/2 -translate-y-1/2 z-30 bg-black text-white p-4 rounded-xl hidden md:block opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-2xl ml-2 hover:bg-red-600 hover:scale-105 border border-gray-800"><ChevronLeft size={22} /></button>
+              <div ref={bestSellersRef} className="flex overflow-x-auto gap-6 md:gap-8 pb-12 scrollbar-hide snap-x px-2 pt-4 lg:justify-center">
+                {bestSellers.map(renderPremiumCard)}
+              </div>
+              <button onClick={() => scroll(bestSellersRef, 'right')} className="absolute right-0 top-1/2 -translate-y-1/2 z-30 bg-black text-white p-4 rounded-xl hidden md:block opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-2xl mr-2 hover:bg-red-600 hover:scale-105 border border-gray-800"><ChevronRight size={22} /></button>
             </div>
           </div>
         </div>

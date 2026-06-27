@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
-  Check, Plus, Minus, Copy, MessageCircle, Star, ChevronDown, ChevronUp, Share2
+  Check, Plus, Minus, Copy, MessageCircle, Star, ChevronDown, ChevronUp, Share2,
+  Truck, RefreshCw, ShieldCheck, X 
 } from 'lucide-react'; 
 import { useCart } from '../context/CartContext';
 import { useProducts } from '../context/ProductContext';
 import { supabase } from '../supabaseClient'; 
+import { Helmet } from 'react-helmet-async'; // 🔥 NEW: Imported Helmet for Dynamic WhatsApp Previews
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -31,6 +33,8 @@ const ProductDetail = () => {
   const [reviews, setReviews] = useState([]);
 
   const [copied, setCopied] = useState(false);
+  
+  const [showSizeChart, setShowSizeChart] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -62,6 +66,10 @@ const ProductDetail = () => {
   }, [id]);
 
   const product = products.find(p => p.id === parseInt(id));
+
+  const relatedProducts = product ? products
+    .filter(p => p.category === product.category && p.id !== product.id)
+    .slice(0, 4) : [];
 
   useEffect(() => {
     if (product) {
@@ -225,15 +233,10 @@ const ProductDetail = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // --- NEW: DESCRIPTION FORMATTER FUNCTION ---
   const formatDescription = (text) => {
     if (!text) return null;
-    
-    // Check if the text uses our asterisk '*' format
     if (text.includes('*')) {
-      // Split by '*', remove empty strings, and clean up whitespace
       const points = text.split('*').map(item => item.trim()).filter(item => item.length > 0);
-      
       return (
         <ul className="list-disc pl-5 space-y-2 mb-4">
           {points.map((point, index) => (
@@ -242,14 +245,39 @@ const ProductDetail = () => {
         </ul>
       );
     }
-    
-    // Fallback if no asterisks are used (just return normal text)
     return <p className="mb-4 text-gray-600">{text}</p>;
   };
 
+  // 🔥 NEW: Setup Safe Image for SEO Meta Tags
+  let seoImage = "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=500&q=80";
+  if (product) {
+    if (product.colors?.[0]?.images?.[0]) seoImage = product.colors[0].images[0];
+    else if (product.images?.[0]) seoImage = product.images[0];
+    else if (product.image) seoImage = product.image;
+  }
+
   return (
-    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full bg-white select-none">
+    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full bg-white select-none pb-28 md:pb-8">
       
+      {/* ================= 🔥 NEW: DYNAMIC SEO & WHATSAPP PREVIEW TAGS ================= */}
+      <Helmet>
+        <title>{product.name} | THREADZS</title>
+        <meta name="description" content={product.description || `Shop the premium ${product.name} at THREADZS. 240 GSM Heavyweight Cotton.`} />
+        
+        {/* WhatsApp & Facebook Open Graph */}
+        <meta property="og:title" content={`${product.name} - ₹${product.price} | THREADZS`} />
+        <meta property="og:description" content={`Check out the ${product.name}. Premium 240 GSM Cotton. Buy now at THREADZS!`} />
+        <meta property="og:image" content={seoImage} />
+        <meta property="og:url" content={shareUrl} />
+        <meta property="og:type" content="product" />
+        
+        {/* Twitter Cards */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`${product.name} - ₹${product.price} | THREADZS`} />
+        <meta name="twitter:description" content={`Check out the ${product.name}. Premium 240 GSM Cotton. Buy now at THREADZS!`} />
+        <meta name="twitter:image" content={seoImage} />
+      </Helmet>
+
       <div className="flex flex-col lg:flex-row gap-10 xl:gap-16">
         
         {/* ================= LEFT: AMAZON STYLE IMAGE GALLERY ================= */}
@@ -300,6 +328,12 @@ const ProductDetail = () => {
 
           <h1 className="text-2xl md:text-4xl font-black mb-4 tracking-tighter uppercase leading-tight text-gray-900">{product.name}</h1>
           
+          {product.stock && product.stock > 0 && product.stock <= 10 && (
+            <div className="mb-4 text-xs font-black text-red-600 uppercase tracking-widest animate-pulse flex items-center gap-1">
+              🔥 Hurry! Only {product.stock} drops left in stock.
+            </div>
+          )}
+
           <div className="inline-flex items-center gap-4 mb-8 bg-gray-50 border border-gray-100 px-5 py-3 rounded-2xl shadow-sm">
             <div className="flex flex-col">
               <span className="text-[9px] font-black text-red-600 uppercase tracking-widest mb-0.5">Drop Price</span>
@@ -356,7 +390,7 @@ const ProductDetail = () => {
           <div className="mb-8">
             <div className="flex justify-between items-center mb-3">
               <h3 className="font-black text-xs uppercase tracking-widest text-gray-500">Select Size:</h3>
-              <button className="text-xs underline font-black text-gray-400 hover:text-black uppercase tracking-wider">SIZE CHART</button>
+              <button onClick={() => setShowSizeChart(true)} className="text-xs underline font-black text-gray-400 hover:text-black uppercase tracking-wider">SIZE CHART</button>
             </div>
             <div className="flex gap-3 flex-wrap">
               {availableSizes.map(size => (
@@ -401,8 +435,22 @@ const ProductDetail = () => {
             </button>
           </div>
 
-          <div className="text-center mb-8 border-b border-gray-100 pb-8">
-            <p className="text-xs text-gray-400 mb-4 font-black uppercase tracking-widest">100% Pre-paid Orders • Free Shipping India</p>
+          <div className="grid grid-cols-3 gap-2 py-4 mb-6 border-y border-gray-100">
+            <div className="flex flex-col items-center justify-center text-center gap-1.5">
+              <Truck size={20} className="text-gray-900"/>
+              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Free Shipping</span>
+            </div>
+            <div className="flex flex-col items-center justify-center text-center gap-1.5 border-x border-gray-100">
+              <RefreshCw size={20} className="text-gray-900"/>
+              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">7-Day Returns</span>
+            </div>
+            <div className="flex flex-col items-center justify-center text-center gap-1.5">
+              <ShieldCheck size={20} className="text-gray-900"/>
+              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">240 GSM Cotton</span>
+            </div>
+          </div>
+
+          <div className="text-center mb-8 pb-4">
             <div className="flex justify-center items-center gap-3 text-gray-400 font-bold text-[10px] uppercase tracking-wider flex-wrap">
               <span className="px-2.5 py-1 border border-gray-200 rounded-md">GPay</span>
               <span className="px-2.5 py-1 border border-gray-200 rounded-md">PhonePe</span>
@@ -441,7 +489,6 @@ const ProductDetail = () => {
               </button>
               {activeAccordion === 'details' && (
                 <div className="pb-5 text-sm leading-relaxed font-medium">
-                  {/* --- NEW: BULLET POINT FORMATTER APPLIED HERE --- */}
                   {formatDescription(product.description)}
                   
                   <div className="mt-4 pt-4 border-t border-gray-100 text-gray-500">
@@ -478,6 +525,26 @@ const ProductDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* ================= 🔥 YOU MAY ALSO LIKE SECTION ================= */}
+      {relatedProducts.length > 0 && (
+        <div className="mt-20 pt-16 border-t border-gray-100">
+          <h2 className="text-2xl font-black mb-8 text-center uppercase tracking-widest text-gray-900">You May Also Like</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+            {relatedProducts.map((item) => (
+              <Link to={`/product/${item.id}`} key={item.id} className="group relative bg-white border border-gray-100 shadow-sm rounded-2xl p-2 hover:shadow-xl hover:border-red-100 transition-all duration-500">
+                <div className="w-full aspect-[4/5] bg-[#f5f5f5] rounded-xl overflow-hidden relative">
+                  <img src={item.images?.[0] || item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                </div>
+                <div className="pt-3 pb-1 px-1 text-center">
+                  <h3 className="text-xs text-gray-900 font-black mb-1 truncate uppercase">{item.name}</h3>
+                  <p className="text-sm text-black font-black">₹{item.price}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ================= BOTTOM: CUSTOMER REVIEWS DYNAMIC SECTION ================= */}
       <div className="mt-20 pt-16 border-t border-gray-100 max-w-3xl mx-auto">
@@ -584,6 +651,60 @@ const ProductDetail = () => {
         </div>
         
       </div>
+
+      {/* ================= 🔥 MOBILE STICKY ADD TO CART BAR ================= */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 flex gap-3 z-[60] md:hidden shadow-[0_-10px_20px_rgba(0,0,0,0.05)] pb-6">
+        <button onClick={handleAddToCart} disabled={isAdded} className={`flex-1 font-black uppercase text-[11px] tracking-wider rounded-xl py-3.5 shadow-md flex justify-center items-center gap-1 transition-all ${isAdded ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+          {isAdded ? <><Check size={16} /> Added</> : 'Add to Cart'}
+        </button>
+        <button onClick={handleBuyNow} className="flex-1 bg-black text-white font-black uppercase text-[11px] tracking-wider rounded-xl py-3.5 shadow-md">Buy Now</button>
+      </div>
+
+      {/* ================= 🔥 SIZE CHART MODAL POPUP ================= */}
+      {showSizeChart && (
+        <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowSizeChart(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="font-black uppercase tracking-widest text-lg">Size Guide (CM)</h3>
+              <button onClick={() => setShowSizeChart(false)} className="p-2 bg-gray-100 rounded-full hover:bg-red-600 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-xs text-gray-500 font-bold mb-4 uppercase tracking-widest text-center">Oversized Fit Measurements</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 font-black uppercase tracking-widest text-[10px] text-gray-500">
+                      <th className="p-3 border-b border-gray-200">Size</th>
+                      <th className="p-3 border-b border-gray-200">Chest (CM)</th>
+                      <th className="p-3 border-b border-gray-200">Length (CM)</th>
+                      <th className="p-3 border-b border-gray-200">Shoulder (CM)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="font-bold text-gray-800">
+                    <tr className="border-b border-gray-100 hover:bg-red-50 transition-colors">
+                      <td className="p-3">S</td><td className="p-3">106</td><td className="p-3">71</td><td className="p-3">52</td>
+                    </tr>
+                    <tr className="border-b border-gray-100 hover:bg-red-50 transition-colors">
+                      <td className="p-3">M</td><td className="p-3">111</td><td className="p-3">73</td><td className="p-3">54</td>
+                    </tr>
+                    <tr className="border-b border-gray-100 hover:bg-red-50 transition-colors">
+                      <td className="p-3">L</td><td className="p-3">116</td><td className="p-3">75</td><td className="p-3">56</td>
+                    </tr>
+                    <tr className="hover:bg-red-50 transition-colors">
+                      <td className="p-3">XL</td><td className="p-3">121</td><td className="p-3">77</td><td className="p-3">58</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="bg-gray-50 p-4 text-center border-t border-gray-100">
+              <button onClick={() => setShowSizeChart(false)} className="font-black text-xs uppercase tracking-widest text-gray-500 hover:text-black">Got It</button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

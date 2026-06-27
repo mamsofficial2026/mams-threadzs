@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 // Removed Instagram and Twitter from here to fix the crash
-import { Mail, MapPin, Phone } from 'lucide-react';
+import { Mail, MapPin, Phone, ShieldCheck } from 'lucide-react'; // 🔥 NEW: Added ShieldCheck for Trust Badge
 
 const Footer = () => {
   return (
@@ -18,7 +18,7 @@ const Footer = () => {
             </p>
             <div className="flex gap-4">
               {/* Native SVG for Instagram (No Lucide dependency) */}
-              <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all">
+              <a href="https://www.instagram.com/threadzs_official/" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
                   <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
@@ -45,18 +45,18 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* Support */}
+          {/* Support / Policies */}
           <div>
-            <h3 className="font-black uppercase tracking-widest text-sm mb-6">Support</h3>
+            <h3 className="font-black uppercase tracking-widest text-sm mb-6">Policies</h3>
             <ul className="space-y-3 text-gray-400 text-sm font-medium">
-              <li><a href="#" className="hover:text-red-500 transition-colors">Contact Us</a></li>
-              <li><a href="#" className="hover:text-red-500 transition-colors">Shipping Policy</a></li>
-              <li><a href="#" className="hover:text-red-500 transition-colors">Returns & Exchanges</a></li>
-              <li><a href="#" className="hover:text-red-500 transition-colors">FAQs</a></li>
+              <li><Link to="/terms-conditions" className="hover:text-red-500 transition-colors">Terms & Conditions</Link></li>
+              <li><Link to="/privacy-policy" className="hover:text-red-500 transition-colors">Privacy Policy</Link></li>
+              <li><Link to="/shipping-policy" className="hover:text-red-500 transition-colors">Shipping Policy</Link></li>
+              <li><Link to="/cancellation-refund" className="hover:text-red-500 transition-colors">Cancellation & Refund</Link></li>
             </ul>
           </div>
 
-          {/* Contact Details */}
+          {/* Contact Details & Trust Signals */}
           <div>
             <h3 className="font-black uppercase tracking-widest text-sm mb-6">Contact Us</h3>
             <ul className="space-y-4 text-gray-400 text-sm font-medium">
@@ -70,9 +70,19 @@ const Footer = () => {
               </li>
               <li className="flex items-center gap-3">
                 <Mail size={18} className="text-red-600 flex-shrink-0" />
-                <span>Threadzsofficial@gmail.com</span>
+                {/* 🔥 UPDATED: Replaced Gmail with professional domain email */}
+                <span>hello@threadzs.com</span>
               </li>
             </ul>
+            
+            {/* 🔥 NEW: Legal Trust Badge (GSTIN) */}
+            <div className="mt-6 p-3 bg-white/5 border border-gray-800 rounded-lg flex items-center gap-3">
+              <ShieldCheck className="text-green-500" size={24} />
+              <div>
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Registered Business</p>
+                <p className="text-xs text-gray-300 font-medium tracking-wide">GSTIN: 33CYQPN5015G1ZD</p>
+              </div>
+            </div>
           </div>
 
         </div>
